@@ -9,6 +9,7 @@ from PyQt5.QtGui import QFont, QPixmap, QBrush, QPalette
 from pages.login import Login
 from pages.home import home
 from pages.remember_pass import remember_pass
+from pages.signup import Signup
 
 
 class BudgetWiseApp(QWidget):
@@ -42,10 +43,12 @@ class BudgetWiseApp(QWidget):
         self.login_widget = Login()
         self.home_page = home()
         self.reset_page = remember_pass()
+        self.signup_page = Signup()
 
         self.stacked_widget.addWidget(self.login_widget)
         self.stacked_widget.addWidget(self.home_page)
         self.stacked_widget.addWidget(self.reset_page)
+        self.stacked_widget.addWidget(self.signup_page) 
 
         self.login_widget.login_successful.connect(self.on_login_success)
 
@@ -53,9 +56,19 @@ class BudgetWiseApp(QWidget):
             lambda: self.stacked_widget.setCurrentIndex(2)
         )
 
+        self.login_widget.signup_requested.connect(
+            lambda: self.stacked_widget.setCurrentIndex(3)
+        )
+
         self.reset_page.back_to_login_requested.connect(
             lambda: self.stacked_widget.setCurrentIndex(0)
         )
+
+        self.signup_page.back_to_login_requested.connect(
+            lambda: self.stacked_widget.setCurrentIndex(0)
+        )
+
+        self.signup_page.signup_successful.connect(self.on_login_success)
 
         footer_layout = QVBoxLayout()
         footer_layout.setSpacing(3)

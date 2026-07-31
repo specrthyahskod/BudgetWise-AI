@@ -1,10 +1,13 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
+from utils.excel_manager import authenticate_user
+
 
 class Login(QWidget):
     login_successful = pyqtSignal(str)
     forgot_password_requested = pyqtSignal()
+    signup_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -26,7 +29,6 @@ class Login(QWidget):
         self.username_input.setFixedHeight(38)
         self.username_input.setStyleSheet("background-color: white; border-radius: 5px; padding: 5px;")
 
-        # Password Input
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Password")
         self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -36,7 +38,7 @@ class Login(QWidget):
 
         self.forgot_btn = QPushButton("Forgot Password?")
         self.forgot_btn.setFixedWidth(280)
-        self.forgot_btn.setFlat(True)  
+        self.forgot_btn.setFlat(True)
         self.forgot_btn.setStyleSheet("""
             QPushButton {
                 color: #2563EB;
@@ -67,26 +69,50 @@ class Login(QWidget):
         """)
         self.login_btn.clicked.connect(self.handle_login)
 
+        self.signup_btn = QPushButton("Don't have an account? Sign Up")
+        self.signup_btn.setFixedWidth(280)
+        self.signup_btn.setFlat(True)
+        self.signup_btn.setStyleSheet("""
+            QPushButton {
+                color: #2563EB;
+                border: none;
+                font-size: 12px;
+                background: transparent;
+            }
+            QPushButton:hover {
+                text-decoration: underline;
+            }
+        """)
+        self.signup_btn.clicked.connect(self.signup_requested.emit)
+
         self.error_label = QLabel("")
         self.error_label.setStyleSheet("color: #DC2626; font-weight: bold;")
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+
         layout.addWidget(heading)
         layout.addWidget(self.username_input)
         layout.addWidget(self.password_input)
         layout.addWidget(self.forgot_btn)
         layout.addWidget(self.login_btn)
+        layout.addWidget(self.signup_btn)
         layout.addWidget(self.error_label)
 
         self.setLayout(layout)
 
     def handle_login(self):
-        username = self.username_input.text().strip()
+        username_or_email = self.username_input.text().strip()
         password = self.password_input.text().strip()
 
-        if not username or not password:
+        if not username_or_email or not password:
             self.error_label.setText("Please enter both username and password.")
             return
+        
+        is_valid, response_data = authenticate_user(username_or_email, password)
 
-        self.error_label.setText("")
-        self.login_successful.emit(username)
+        if is_valid:
+            self.error_label.setText("")
+            self.username_input.clear()
+            self.password_input.clear()
+            self.login_successful.emit(response_data)
+        else:
+            self.error_label.setText(response_data)
