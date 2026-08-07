@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, QDate, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
 from utils.manager import ThemeManager
 
+
 COUNTRY_DATA = {
     "India 🇮🇳": {"currency": "INR (₹)", "rate": 55.50},
     "China 🇨🇳": {"currency": "CNY (¥)", "rate": 4.75},
@@ -18,12 +19,12 @@ COUNTRY_DATA = {
     "Malaysia 🇲🇾": {"currency": "MYR (RM)", "rate": 3.10}
 }
 
+
 class EmergencyFundDialog(QDialog):
     def __init__(self, current_fund, remaining_savings, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Emergency Vault Control")
         self.setFixedSize(340, 260)
-        self.setStyleSheet("background-color: #FFFFFF;")
         self.current_fund = current_fund
         self.remaining_savings = remaining_savings
         self.init_ui()
@@ -100,7 +101,6 @@ class CurrencyConverterDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Personalized AUD Currency Converter")
         self.setFixedSize(320, 260)
-        self.setStyleSheet("background-color: #FFFFFF;")
         self.selected_country = selected_country
         self.init_ui()
 
@@ -161,12 +161,12 @@ class CurrencyConverterDialog(QDialog):
 
 
 class VisaWorkTrackerDialog(QDialog):
-    def __init__(self, hourly_wage, parent=None):
+    def __init__(self, hourly_wage, hours_worked, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Australia Visa Work Limits")
         self.setFixedSize(340, 290)
-        self.setStyleSheet("background-color: #FFFFFF;")
         self.hourly_wage = hourly_wage
+        self.hours_worked = hours_worked
         self.init_ui()
 
     def init_ui(self):
@@ -180,17 +180,19 @@ class VisaWorkTrackerDialog(QDialog):
 
         self.w1_input = QLineEdit()
         self.w1_input.setPlaceholderText("Week 1 Hours Worked")
+        self.w1_input.setText(str(self.hours_worked / 2.0))
         self.w1_input.setFixedHeight(34)
 
         self.w2_input = QLineEdit()
         self.w2_input.setPlaceholderText("Week 2 Hours Worked")
+        self.w2_input.setText(str(self.hours_worked / 2.0))
         self.w2_input.setFixedHeight(34)
 
         self.status_label = QLabel(f"Limit: 48 hrs / fortnight | Pay: ${self.hourly_wage:.2f}/hr")
         self.status_label.setFont(QFont("Arial", 9, QFont.Bold))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        check_btn = QPushButton("Check Compliance & Earnings")
+        check_btn = QPushButton("Update Work Hours")
         check_btn.setFixedHeight(36)
         check_btn.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold; border-radius: 6px;")
         check_btn.clicked.connect(self.check_compliance)
@@ -217,118 +219,73 @@ class VisaWorkTrackerDialog(QDialog):
         else:
             w2 = float(w2_text)
 
-        total = w1 + w2
-        earnings = total * self.hourly_wage
+        self.hours_worked = w1 + w2
+        earnings = self.hours_worked * self.hourly_wage
 
-        if total > 48:
-            self.status_label.setText(f"❌ Visa Breach! {total} hrs (>48 hrs)\nEarned: ${earnings:,.2f}")
+        if self.hours_worked > 48:
+            self.status_label.setText(f"❌ Visa Breach! {self.hours_worked} hrs (>48 hrs)\nEarned: ${earnings:,.2f}")
             self.status_label.setStyleSheet("color: #DC2626; font-weight: bold;")
         else:
-            rem = 48 - total
-            self.status_label.setText(f"✅ Compliant! Total: {total} hrs ({rem} hrs left)\nEst. Income: ${earnings:,.2f}")
+            rem = 48 - self.hours_worked
+            self.status_label.setText(f"✅ Compliant! Total: {self.hours_worked} hrs ({rem} hrs left)\nEst. Income: ${earnings:,.2f}")
             self.status_label.setStyleSheet("color: #16A34A; font-weight: bold;")
+            self.accept()
+
+    def get_hours(self):
+        return self.hours_worked
 
 
 class SetWageDialog(QDialog):
-    def __init__(self, current_wage, parent=None):
+    def __init__(self, current_wage, current_hours, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Set Hourly Wage")
-        self.setFixedSize(300, 180)
-        self.setStyleSheet("background-color: #FFFFFF;")
-        self.init_ui(current_wage)
+        self.setWindowTitle("Set Wage & Hours")
+        self.setFixedSize(300, 220)
+        self.init_ui(current_wage, current_hours)
 
-    def init_ui(self, current_wage):
+    def init_ui(self, current_wage, current_hours):
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
+        layout.setSpacing(10)
 
-        title = QLabel("Input Hourly Wage (AUD)")
+        title = QLabel("Input Work Details")
         title.setFont(QFont("Arial", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        layout.addWidget(title)
+        layout.addWidget(QLabel("Hourly Wage (AUD):"))
         self.wage_input = QLineEdit()
         self.wage_input.setText(str(current_wage))
-        self.wage_input.setFixedHeight(36)
+        self.wage_input.setFixedHeight(34)
+        layout.addWidget(self.wage_input)
 
-        save_btn = QPushButton("Save Wage")
+        layout.addWidget(QLabel("Fortnight Hours Worked:"))
+        self.hours_input = QLineEdit()
+        self.hours_input.setText(str(current_hours))
+        self.hours_input.setFixedHeight(34)
+        layout.addWidget(self.hours_input)
+
+        save_btn = QPushButton("Save Details")
         save_btn.setFixedHeight(34)
         save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px;")
         save_btn.clicked.connect(self.accept)
-
-        layout.addWidget(title)
-        layout.addWidget(self.wage_input)
         layout.addWidget(save_btn)
 
         self.setLayout(layout)
 
-    def get_wage(self):
-        text_val = self.wage_input.text().strip()
+    def get_details(self):
+        w_text = self.wage_input.text().strip()
+        h_text = self.hours_input.text().strip()
         try:
-            return float(text_val)
+            w = float(w_text)
         except:
-            return 26.44
+            w = 26.44
 
-
-class SetBudgetDialog(QDialog):
-    def __init__(self, current_budget, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Set Fortnightly Budget")
-        self.setFixedSize(300, 180)
-        self.setStyleSheet("background-color: #FFFFFF;")
-        self.init_ui(current_budget)
-
-    def init_ui(self, current_budget):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(12)
-
-        title = QLabel("Set Fortnightly Allowance")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.budget_input = QLineEdit()
-        self.budget_input.setPlaceholderText("Enter Total Budget ($)")
-        self.budget_input.setText(str(current_budget))
-        self.budget_input.setFixedHeight(36)
-
-        self.error_label = QLabel("")
-        self.error_label.setStyleSheet("color: #DC2626; font-size: 11px;")
-        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        btn_layout = QHBoxLayout()
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedHeight(34)
-        cancel_btn.clicked.connect(self.reject)
-
-        save_btn = QPushButton("Save Budget")
-        save_btn.setFixedHeight(34)
-        save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px;")
-        save_btn.clicked.connect(self.validate_and_accept)
-
-        btn_layout.addWidget(cancel_btn)
-        btn_layout.addWidget(save_btn)
-
-        layout.addWidget(title)
-        layout.addWidget(self.budget_input)
-        layout.addWidget(self.error_label)
-        layout.addLayout(btn_layout)
-
-        self.setLayout(layout)
-
-    def validate_and_accept(self):
-        val_text = self.budget_input.text().strip()
         try:
-            val = float(val_text)
-            if val < 0:
-                self.error_label.setText("Budget cannot be negative.")
-                return
-            self.accept()
+            h = float(h_text)
         except:
-            self.error_label.setText("Enter a valid number.")
+            h = 48.0
 
-    def get_budget(self):
-        return float(self.budget_input.text().strip())
+        return w, h
 
 
 class AddTransactionDialog(QDialog):
@@ -336,7 +293,6 @@ class AddTransactionDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Log New Transaction")
         self.setFixedSize(320, 380)
-        self.setStyleSheet("background-color: #FFFFFF;")
         self.init_ui()
 
     def init_ui(self):
@@ -437,8 +393,11 @@ class home(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.username = "Student"
-        self.total_budget = 2000.00
+        
         self.hourly_wage = 26.44
+        self.fortnight_hours = 48.0
+        self.total_budget = self.hourly_wage * self.fortnight_hours
+        
         self.emergency_vault = 300.00
         self.selected_country = "India 🇮🇳"
         
@@ -500,7 +459,7 @@ class home(QWidget):
         btn_theme.setFixedHeight(36)
         btn_theme.clicked.connect(self.toggle_app_theme)
 
-        btn_set_wage = QPushButton("💵 Set Hourly Wage")
+        btn_set_wage = QPushButton("💵 Set Wage & Hours")
         btn_set_wage.setFixedHeight(36)
         btn_set_wage.clicked.connect(self.open_set_wage_dialog)
 
@@ -555,13 +514,6 @@ class home(QWidget):
 
         welcome_card = QFrame()
         welcome_card.setFixedHeight(75)
-        welcome_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.95);
-                border: 1px solid rgba(229, 231, 235, 0.8);
-                border-radius: 12px;
-            }
-        """)
 
         welcome_layout = QVBoxLayout(welcome_card)
         welcome_layout.setContentsMargins(15, 10, 15, 10)
@@ -585,7 +537,7 @@ class home(QWidget):
         self.budget_box, self.lbl_budget_val, self.lbl_budget_sub = self.create_metric_card(
             title="Fortnight Budget",
             amount=f"${self.total_budget:.2f}",
-            subtitle="Allowance",
+            subtitle=f"{self.fortnight_hours:.0f} hrs @ ${self.hourly_wage:.2f}/hr",
             border_color="#2563EB",
             text_color="#1E40AF"
         )
@@ -612,24 +564,6 @@ class home(QWidget):
 
         tools_frame = QFrame()
         tools_frame.setFixedHeight(50)
-        tools_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.95);
-                border-radius: 10px;
-                border: 1px solid #E5E7EB;
-            }
-            QPushButton {
-                background-color: #F1F5F9;
-                color: #0F172A;
-                font-weight: bold;
-                border: 1px solid #CBD5E1;
-                border-radius: 6px;
-                padding: 4px 12px;
-            }
-            QPushButton:hover {
-                background-color: #E2E8F0;
-            }
-        """)
         tools_layout = QHBoxLayout(tools_frame)
         tools_layout.setContentsMargins(15, 5, 15, 5)
 
@@ -648,14 +582,6 @@ class home(QWidget):
         tools_layout.addWidget(btn_visa)
 
         table_container = QFrame()
-        table_container.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.95);
-                border-radius: 12px;
-                border: 1px solid rgba(229, 231, 235, 0.8);
-            }
-        """)
-
         container_layout = QVBoxLayout(table_container)
         container_layout.setContentsMargins(15, 12, 15, 15)
         container_layout.setSpacing(10)
@@ -663,21 +589,6 @@ class home(QWidget):
         t_header_layout = QHBoxLayout()
         tbl_title = QLabel("💳 Fortnight Transactions")
         tbl_title.setFont(QFont("Arial", 13, QFont.Bold))
-
-        self.edit_budget_btn = QPushButton("Set Budget")
-        self.edit_budget_btn.setFixedHeight(32)
-        self.edit_budget_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4B5563;
-                color: white;
-                font-weight: bold;
-                font-size: 11px;
-                border-radius: 6px;
-                padding: 0 10px;
-                border: none;
-            }
-        """)
-        self.edit_budget_btn.clicked.connect(self.open_set_budget_dialog)
 
         self.add_btn = QPushButton("+ Add Transaction")
         self.add_btn.setFixedHeight(32)
@@ -696,7 +607,6 @@ class home(QWidget):
 
         t_header_layout.addWidget(tbl_title)
         t_header_layout.addStretch()
-        t_header_layout.addWidget(self.edit_budget_btn)
         t_header_layout.addWidget(self.add_btn)
 
         self.transactions_table = QTableWidget()
@@ -764,13 +674,7 @@ class home(QWidget):
     def create_metric_card(self, title, amount, subtitle, border_color, text_color):
         card = QFrame()
         card.setFixedHeight(120)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(255, 255, 255, 0.95);
-                border-top: 5px solid {border_color};
-                border-radius: 12px;
-            }}
-        """)
+        card.setStyleSheet(f"border-top: 5px solid {border_color};")
 
         layout = QVBoxLayout(card)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -831,6 +735,7 @@ class home(QWidget):
             else:
                 total_expenses = total_expenses + val
 
+        self.total_budget = self.hourly_wage * self.fortnight_hours
         effective_budget = self.total_budget + total_income
         total_savings = effective_budget - total_expenses
 
@@ -842,6 +747,8 @@ class home(QWidget):
             savings_pct = 0.0
 
         self.lbl_budget_val.setText(f"${effective_budget:,.2f}")
+        self.lbl_budget_sub.setText(f"{self.fortnight_hours:.0f} hrs @ ${self.hourly_wage:.2f}/hr")
+
         self.lbl_expenses_val.setText(f"${total_expenses:,.2f}")
         self.lbl_expenses_sub.setText(f"{expense_pct:.1f}% of Budget")
 
@@ -897,24 +804,21 @@ class home(QWidget):
             self.populate_table()
             self.recalculate_totals()
 
-    def open_set_budget_dialog(self):
-        dialog = SetBudgetDialog(self.total_budget, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.total_budget = dialog.get_budget()
-            self.recalculate_totals()
-
     def open_set_wage_dialog(self):
-        dlg = SetWageDialog(self.hourly_wage, self)
+        dlg = SetWageDialog(self.hourly_wage, self.fortnight_hours, self)
         if dlg.exec_() == QDialog.Accepted:
-            self.hourly_wage = dlg.get_wage()
+            self.hourly_wage, self.fortnight_hours = dlg.get_details()
+            self.recalculate_totals()
 
     def open_currency_converter(self):
         dlg = CurrencyConverterDialog(self.selected_country, self)
         dlg.exec_()
 
     def open_visa_tracker(self):
-        dlg = VisaWorkTrackerDialog(self.hourly_wage, self)
-        dlg.exec_()
+        dlg = VisaWorkTrackerDialog(self.hourly_wage, self.fortnight_hours, self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.fortnight_hours = dlg.get_hours()
+            self.recalculate_totals()
 
     def get_report_data(self):
         all_transactions = self.history_data + self.transactions_data
