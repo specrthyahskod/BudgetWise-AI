@@ -1,3 +1,4 @@
+import webbrowser
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QPushButton,
@@ -9,10 +10,8 @@ from PyQt5.QtGui import QFont, QColor, QTextCharFormat
 from utils.manager import ThemeManager
 from utils.user_data_manager import UserDataManager
 from models.ai_engine import StudentAIEngine
-from models.fin_math_model import finance_calc
 
 ai_engine = StudentAIEngine()
-math_engine = finance_calc(total_fortnight_days=14)
 
 COUNTRY_DATA = {
     "India 🇮🇳": {"currency": "INR (₹)", "rate": 55.50},
@@ -24,6 +23,15 @@ COUNTRY_DATA = {
     "Philippines 🇵🇭": {"currency": "PHP (₱)", "rate": 38.20},
     "Malaysia 🇲🇾": {"currency": "MYR (RM)", "rate": 3.10}
 }
+
+def calculate_ewma(samples, alpha=0.35):
+    """Computes Exponentially Weighted Moving Average for spend velocity."""
+    if not samples:
+        return 0.0
+    ewma = samples[0]
+    for sample in samples[1:]:
+        ewma = (alpha * sample) + ((1 - alpha) * ewma)
+    return ewma
 
 class WorkCalendarDialog(QDialog):
     def __init__(self, work_days, parent=None):
@@ -46,7 +54,6 @@ class WorkCalendarDialog(QDialog):
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(False)
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
-        
         self.calendar.setStyleSheet("""
             QCalendarWidget {
                 background-color: #1E293B;
@@ -63,23 +70,13 @@ class WorkCalendarDialog(QDialog):
                 font-weight: bold;
                 border-radius: 4px;
             }
-            QCalendarWidget QToolButton:hover {
-                background-color: #334155;
-            }
-            QCalendarWidget QMenu {
-                background-color: #1E293B;
-                color: #F8FAFC;
-            }
-            QCalendarWidget QSpinBox {
-                color: #F8FAFC;
-                background-color: #0F172A;
-                selection-background-color: #2563EB;
-            }
+            QCalendarWidget QToolButton:hover { background-color: #334155; }
+            QCalendarWidget QMenu { background-color: #1E293B; color: #F8FAFC; }
+            QCalendarWidget QSpinBox { color: #F8FAFC; background-color: #0F172A; }
             QCalendarWidget QTableView {
                 background-color: #1E293B;
                 color: #F8FAFC;
                 selection-background-color: #2563EB;
-                selection-color: #FFFFFF;
                 gridline-color: #334155;
             }
             QCalendarWidget QHeaderView::section {
@@ -94,7 +91,6 @@ class WorkCalendarDialog(QDialog):
         self.highlight_format = QTextCharFormat()
         self.highlight_format.setBackground(QColor("#16A34A"))
         self.highlight_format.setForeground(QColor("#FFFFFF"))
-
         self.normal_format = QTextCharFormat()
 
         self.status_label = QLabel("")
@@ -104,30 +100,12 @@ class WorkCalendarDialog(QDialog):
 
         btn_toggle = QPushButton("Mark / Unmark Date Worked")
         btn_toggle.setFixedHeight(38)
-        btn_toggle.setStyleSheet("""
-            QPushButton {
-                background-color: #2563EB;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                border: none;
-            }
-            QPushButton:hover { background-color: #1D4ED8; }
-        """)
+        btn_toggle.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px; border: none;")
         btn_toggle.clicked.connect(self.toggle_selected_date)
 
         btn_save = QPushButton("Save & Update Budget")
         btn_save.setFixedHeight(38)
-        btn_save.setStyleSheet("""
-            QPushButton {
-                background-color: #16A34A;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                border: none;
-            }
-            QPushButton:hover { background-color: #15803D; }
-        """)
+        btn_save.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold; border-radius: 6px; border: none;")
         btn_save.clicked.connect(self.accept)
 
         layout.addWidget(title)
@@ -143,25 +121,21 @@ class WorkCalendarDialog(QDialog):
         for date_str in self.work_days:
             qdate = QDate.fromString(date_str, "yyyy-MM-dd")
             self.calendar.setDateTextFormat(qdate, self.highlight_format)
-        
         self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
 
     def toggle_selected_date(self):
         selected_qdate = self.calendar.selectedDate()
         date_str = selected_qdate.toString("yyyy-MM-dd")
-
         if date_str in self.work_days:
             self.work_days.remove(date_str)
             self.calendar.setDateTextFormat(selected_qdate, self.normal_format)
         else:
             self.work_days.add(date_str)
             self.calendar.setDateTextFormat(selected_qdate, self.highlight_format)
-
         self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
 
     def get_work_days(self):
         return list(self.work_days)
-
 
 class EmergencyFundDialog(QDialog):
     def __init__(self, current_fund, remaining_savings, parent=None):
@@ -211,7 +185,7 @@ class EmergencyFundDialog(QDialog):
             val = float(self.amount_input.text().strip())
             if val <= 0:
                 return
-            self.current_fund = self.current_fund + val
+            self.current_fund += val
             self.accept()
         except:
             pass
@@ -230,14 +204,13 @@ class EmergencyFundDialog(QDialog):
             if val > self.current_fund:
                 QMessageBox.warning(self, "Error", "Cannot withdraw more than current vault balance!")
                 return
-            self.current_fund = self.current_fund - val
+            self.current_fund -= val
             self.accept()
         except:
             pass
 
     def get_fund(self):
         return self.current_fund
-
 
 class CurrencyConverterDialog(QDialog):
     def __init__(self, selected_country, parent=None):
@@ -301,7 +274,6 @@ class CurrencyConverterDialog(QDialog):
             self.result_label.setText(f"Converted: {symbol}{converted:,.2f}")
         except:
             self.result_label.setText("Enter a valid number!")
-
 
 class VisaWorkTrackerDialog(QDialog):
     def __init__(self, hourly_wage, hours_worked, parent=None):
@@ -370,7 +342,6 @@ class VisaWorkTrackerDialog(QDialog):
     def get_hours(self):
         return self.hours_worked
 
-
 class SetWageDialog(QDialog):
     def __init__(self, current_wage, current_shift_hours, parent=None):
         super().__init__(parent)
@@ -422,7 +393,6 @@ class SetWageDialog(QDialog):
             h = 6.0
 
         return w, h
-
 
 class AddTransactionDialog(QDialog):
     def __init__(self, parent=None):
@@ -523,7 +493,6 @@ class AddTransactionDialog(QDialog):
         desc = self.desc_input.text().strip()
         category = self.category_combo.currentText()
         val = float(self.amount_input.text().strip())
-        
         formatted_amount = f"+${val:.2f}" if category == "Income" else f"-${val:.2f}"
         return date_str, desc, category, formatted_amount, val
 
@@ -543,7 +512,6 @@ class home(QWidget):
         self.work_days = self.user_data.get("work_days", [])
         
         self.total_budget = len(self.work_days) * self.hours_per_shift * self.hourly_wage
-        
         self.emergency_vault = self.user_data.get("emergency_vault", 300.00)
         self.selected_country = self.user_data.get("selected_country", "India 🇮🇳")
         
@@ -575,14 +543,8 @@ class home(QWidget):
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(220)
         self.sidebar.setStyleSheet("""
-            QFrame {
-                background-color: #1E293B;
-                border-radius: 12px;
-                border: 1px solid #334155;
-            }
-            QLabel {
-                color: #F8FAFC;
-            }
+            QFrame { background-color: #1E293B; border-radius: 12px; border: 1px solid #334155; }
+            QLabel { color: #F8FAFC; }
             QPushButton {
                 background-color: #0F172A;
                 color: #F8FAFC;
@@ -592,10 +554,7 @@ class home(QWidget):
                 padding-left: 12px;
                 font-weight: 600;
             }
-            QPushButton:hover {
-                background-color: #2563EB;
-                border-color: #2563EB;
-            }
+            QPushButton:hover { background-color: #2563EB; border-color: #2563EB; }
         """)
 
         sidebar_layout = QVBoxLayout(self.sidebar)
@@ -625,6 +584,25 @@ class home(QWidget):
         btn_set_wage.setFixedHeight(36)
         btn_set_wage.clicked.connect(self.open_set_wage_dialog)
 
+        btn_upgrade = QPushButton("⭐ Upgrade")
+        btn_upgrade.setFixedHeight(36)
+        btn_upgrade.setStyleSheet("""
+            QPushButton {
+                background-color: #D97706;
+                color: white;
+                border: 1px solid #F59E0B;
+                border-radius: 6px;
+                text-align: left;
+                padding-left: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #B45309;
+                border-color: #F59E0B;
+            }
+        """)
+        btn_upgrade.clicked.connect(self.open_upgrade_dialog)
+
         btn_reset_fn = QPushButton("🔄 Reset Fortnight")
         btn_reset_fn.setFixedHeight(36)
         btn_reset_fn.clicked.connect(self.trigger_fortnight_reset)
@@ -646,6 +624,7 @@ class home(QWidget):
         sidebar_layout.addWidget(btn_calendar)
         sidebar_layout.addWidget(btn_vault)
         sidebar_layout.addWidget(btn_set_wage)
+        sidebar_layout.addWidget(btn_upgrade)
         sidebar_layout.addWidget(btn_reset_fn)
         sidebar_layout.addWidget(country_label)
         sidebar_layout.addWidget(self.sidebar_country_combo)
@@ -657,29 +636,14 @@ class home(QWidget):
         main_layout = QVBoxLayout(self.content_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(15)
-        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         header_bar = QHBoxLayout()
-        header_bar.setSpacing(10)
-        
-        self.menu_btn = QPushButton("☰")
-        self.menu_btn.setFixedSize(40, 40)
-        self.menu_btn.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        self.menu_btn.clicked.connect(self.toggle_sidebar)
-
         welcome_card = QFrame()
         welcome_card.setFixedHeight(65)
-        welcome_card.setStyleSheet("""
-            QFrame {
-                background-color: rgba(30, 41, 59, 0.7);
-                border: 1px solid rgba(51, 65, 85, 0.8);
-                border-radius: 12px;
-            }
-        """)
+        welcome_card.setStyleSheet("background-color: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 12px;")
 
         welcome_layout = QVBoxLayout(welcome_card)
         welcome_layout.setContentsMargins(15, 8, 15, 8)
-        welcome_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.welcome_label = QLabel(f"Welcome back, {self.username}! 👋")
         self.welcome_label.setFont(QFont("Segoe UI", 15, QFont.Bold))
@@ -691,35 +655,23 @@ class home(QWidget):
 
         welcome_layout.addWidget(self.welcome_label)
         welcome_layout.addWidget(self.sub_label)
-
-        header_bar.addWidget(self.menu_btn)
         header_bar.addWidget(welcome_card, 1)
 
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(15)
 
         self.budget_box, self.lbl_budget_val, self.lbl_budget_sub = self.create_metric_card(
-            title="Accrued Budget",
-            amount=f"${self.total_budget:.2f}",
-            subtitle=f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr",
-            border_color="rgba(59, 130, 246, 0.4)",
-            text_color="#60A5FA"
+            "Accrued Budget", f"${self.total_budget:.2f}",
+            f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr",
+            "rgba(59, 130, 246, 0.4)", "#60A5FA"
         )
-
         self.expenses_box, self.lbl_expenses_val, self.lbl_expenses_sub = self.create_metric_card(
-            title="Fortnight Expenses",
-            amount="$0.00",
-            subtitle="0.0% of Budget",
-            border_color="rgba(239, 68, 68, 0.4)",
-            text_color="#F87171"
+            "Fortnight Expenses", "$0.00", "0.0% of Budget",
+            "rgba(239, 68, 68, 0.4)", "#F87171"
         )
-
         self.savings_box, self.lbl_savings_val, self.lbl_savings_sub = self.create_metric_card(
-            title="Remaining Balance",
-            amount=f"${self.total_budget:.2f}",
-            subtitle="100.0% Remaining",
-            border_color="rgba(34, 197, 94, 0.4)",
-            text_color="#4ADE80"
+            "Remaining Balance", f"${self.total_budget:.2f}", "100.0% Remaining",
+            "rgba(34, 197, 94, 0.4)", "#4ADE80"
         )
 
         cards_layout.addWidget(self.budget_box)
@@ -733,22 +685,25 @@ class home(QWidget):
 
         tools_title = QLabel("🇦🇺 Student Tools:")
         tools_title.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        tools_title.setStyleSheet("color: #F8FAFC;")
 
         btn_currency = QPushButton(f"🔀 AUD Converter ({self.selected_country})")
         self.btn_currency_ref = btn_currency
+        btn_currency.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
         btn_currency.clicked.connect(self.open_currency_converter)
 
         btn_visa = QPushButton("⏱️ 48-Hr Work Tracker")
+        btn_visa.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
         btn_visa.clicked.connect(self.open_visa_tracker)
 
         tools_layout.addWidget(tools_title)
         tools_layout.addWidget(btn_currency)
         tools_layout.addWidget(btn_visa)
+        tools_layout.addStretch()
 
         table_container = QFrame()
         container_layout = QVBoxLayout(table_container)
         container_layout.setContentsMargins(15, 12, 15, 15)
-        container_layout.setSpacing(10)
 
         t_header_layout = QHBoxLayout()
         tbl_title = QLabel("💳 Fortnight Transactions")
@@ -756,17 +711,7 @@ class home(QWidget):
 
         self.add_btn = QPushButton("+ Add Transaction")
         self.add_btn.setFixedHeight(34)
-        self.add_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2563EB;
-                color: white;
-                font-weight: bold;
-                border-radius: 6px;
-                padding: 0 14px;
-                border: none;
-            }
-            QPushButton:hover { background-color: #1D4ED8; }
-        """)
+        self.add_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px; border: none; padding: 0 14px;")
         self.add_btn.clicked.connect(self.open_add_transaction_dialog)
 
         t_header_layout.addWidget(tbl_title)
@@ -782,9 +727,7 @@ class home(QWidget):
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-
         self.transactions_table.verticalHeader().setVisible(False)
-        self.transactions_table.setSelectionMode(QTableWidget.NoSelection)
 
         container_layout.addLayout(t_header_layout)
         container_layout.addWidget(self.transactions_table)
@@ -799,70 +742,15 @@ class home(QWidget):
 
         self.setLayout(root_layout)
         ThemeManager.apply_dark_theme(self)
-
-        self.check_auto_fortnight_reset()
         self.populate_table()
         self.recalculate_totals()
-
-    def open_work_calendar_dialog(self):
-        dlg = WorkCalendarDialog(self.work_days, self)
-        if dlg.exec_() == QDialog.Accepted:
-            self.work_days = dlg.get_work_days()
-            self.recalculate_totals()
-            self.save_state()
-
-    def check_auto_fortnight_reset(self):
-        today = QDate.currentDate()
-        days_passed = self.fortnight_start_date.daysTo(today)
-
-        if days_passed >= 14:
-            self.trigger_fortnight_reset()
-        else:
-            days_left = 14 - days_passed
-            self.sub_label.setText(f"Australia Student Companion | Days left in fortnight: {days_left}")
-
-    def trigger_fortnight_reset(self):
-        if len(self.transactions_data) > 0:
-            for item in self.transactions_data:
-                self.history_data.append(item)
-
-        self.transactions_data = []
-        self.work_days = []
-        self.fortnight_start_date = QDate.currentDate()
-        self.populate_table()
-        self.recalculate_totals()
-        self.save_state()
-        self.sub_label.setText("Fortnight Cycle Reset! Days remaining in fortnight: 14")
-
-    def toggle_sidebar(self):
-        if self.sidebar.isVisible():
-            self.sidebar.setVisible(False)
-        else:
-            self.sidebar.setVisible(True)
-
-    def on_country_changed(self, text):
-        self.selected_country = text
-        self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
-        self.save_state()
 
     def create_metric_card(self, title, amount, subtitle, border_color, text_color):
         card = QFrame()
         card.setFixedHeight(125)
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(30, 41, 59, 0.7);
-                border: 1px solid {border_color};
-                border-radius: 12px;
-            }}
-            QFrame:hover {{
-                background-color: rgba(30, 41, 59, 0.9);
-                border: 1px solid {text_color};
-            }}
-        """)
-
+        card.setStyleSheet(f"background-color: rgba(30, 41, 59, 0.7); border: 1px solid {border_color}; border-radius: 12px;")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(15, 12, 15, 12)
-        layout.setSpacing(4)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lbl_title = QLabel(title)
@@ -871,12 +759,7 @@ class home(QWidget):
 
         lbl_amount = QLabel(amount)
         lbl_amount.setFont(QFont("Segoe UI", 22, QFont.Bold))
-        lbl_amount.setStyleSheet(f"""
-            color: {text_color};
-            background: transparent;
-            border: none;
-            padding: 2px 0px;
-        """)
+        lbl_amount.setStyleSheet(f"color: {text_color}; background: transparent; border: none;")
 
         lbl_sub = QLabel(subtitle)
         lbl_sub.setFont(QFont("Segoe UI", 8))
@@ -885,109 +768,74 @@ class home(QWidget):
         layout.addWidget(lbl_title)
         layout.addWidget(lbl_amount)
         layout.addWidget(lbl_sub)
-
         return card, lbl_amount, lbl_sub
 
     def populate_table(self):
         self.transactions_table.setRowCount(len(self.transactions_data))
         for row_idx, item in enumerate(self.transactions_data):
-            date_str = item[0]
-            desc = item[1]
-            cat = item[2]
-            formatted_amount = item[3]
+            date_item = QTableWidgetItem(item[0])
+            desc_item = QTableWidgetItem(item[1])
+            cat_item = QTableWidgetItem(item[2])
+            amount_item = QTableWidgetItem(item[3])
 
-            date_item = QTableWidgetItem(date_str)
-            desc_item = QTableWidgetItem(desc)
-            cat_item = QTableWidgetItem(cat)
-            amount_item = QTableWidgetItem(formatted_amount)
-
-            date_item.setTextAlignment(int(Qt.AlignCenter))
-            cat_item.setTextAlignment(int(Qt.AlignCenter))
-            amount_item.setTextAlignment(int(Qt.AlignRight | Qt.AlignVCenter))
-
-            if cat == "Income":
-                amount_item.setForeground(QColor("#22C55E"))
-            else:
-                amount_item.setForeground(QColor("#EF4444"))
-
+            amount_item.setForeground(QColor("#22C55E") if item[2] == "Income" else QColor("#EF4444"))
             self.transactions_table.setItem(row_idx, 0, date_item)
             self.transactions_table.setItem(row_idx, 1, desc_item)
             self.transactions_table.setItem(row_idx, 2, cat_item)
             self.transactions_table.setItem(row_idx, 3, amount_item)
 
     def recalculate_totals(self):
-        total_expenses = 0.0
-        total_income = 0.0
-
-        for item in self.transactions_data:
-            cat = item[2]
-            val = item[4]
-            if cat == "Income":
-                total_income = total_income + val
-            else:
-                total_expenses = total_expenses + val
+        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+        total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
 
         self.total_budget = len(self.work_days) * self.hours_per_shift * self.hourly_wage
         effective_budget = self.total_budget + total_income
         total_savings = effective_budget - total_expenses
 
-        if effective_budget > 0:
-            expense_pct = (total_expenses / effective_budget) * 100
-            savings_pct = (total_savings / effective_budget) * 100
-        else:
-            expense_pct = 0.0
-            savings_pct = 0.0
+        expense_pct = (total_expenses / effective_budget * 100) if effective_budget > 0 else 0.0
+        savings_pct = (total_savings / effective_budget * 100) if effective_budget > 0 else 0.0
 
         self.lbl_budget_val.setText(f"${effective_budget:,.2f}")
         self.lbl_budget_sub.setText(f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr")
-
         self.lbl_expenses_val.setText(f"${total_expenses:,.2f}")
         self.lbl_expenses_sub.setText(f"{expense_pct:.1f}% of Budget")
-
         self.lbl_savings_val.setText(f"${total_savings:,.2f}")
         self.lbl_savings_sub.setText(f"{savings_pct:.1f}% Remaining")
 
-    def run_ai_safespend_check(self, expense_val):
+    def run_ai_safespend_check(self, proposed_amount):
+        """Calculates EWMA projection and returns a user-friendly warning message."""
         today = QDate.currentDate()
-        days_passed = max(self.fortnight_start_date.daysTo(today), 1)
+        t_current = max(min(self.fortnight_start_date.daysTo(today), 14), 1)
+        t_target = 14.0
 
-        daily_expenses = {}
+        daily_expenses_map = {}
         for item in self.transactions_data:
             if item[2] != "Income":
                 tx_date = QDate.fromString(item[0], "yyyy-MM-dd")
-                day_num = max(self.fortnight_start_date.daysTo(tx_date), 1)
-                daily_expenses[day_num] = daily_expenses.get(day_num, 0.0) + item[4]
+                day_idx = max(self.fortnight_start_date.daysTo(tx_date), 1)
+                daily_expenses_map[day_idx] = daily_expenses_map.get(day_idx, 0.0) + item[4]
 
-        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
-        
-        forecast = math_engine.forecast_end_of_fortnight(
-            current_day=days_passed,
-            current_expenses=total_expenses + expense_val,
-            accrued_budget=self.total_budget,
-            daily_expenses_dict=daily_expenses
-        )
+        daily_samples = [daily_expenses_map.get(d, 0.0) for d in range(1, t_current + 1)]
+        v_ewma = calculate_ewma(daily_samples, alpha=0.35)
 
-        if not forecast["is_solvent"]:
-            msg = (
-                f"⚠️ FINANCIAL MODEL WARNING:\n\n"
-                f"Current Daily Burn Rate: ${forecast['burn_rate_per_day']:.2f}/day\n"
-                f"Projected Fortnight Spend: ${forecast['projected_total_expense']:.2f}\n"
-                f"Projected Deficit: ${forecast['projected_deficit']:.2f}\n\n"
-                f"Recommended Safe Limit: ${forecast['safe_daily_limit']:.2f}/day"
+        e_current = sum(item[4] for item in self.transactions_data if item[2] != "Income") + proposed_amount
+        time_remaining = t_target - t_current
+        e_projected = e_current + (v_ewma * time_remaining)
+
+        if e_projected > self.total_budget:
+            deficit = e_projected - self.total_budget
+            safe_daily_limit = max((self.total_budget - e_current) / max(time_remaining, 1), 0.0)
+            
+            warning_msg = (
+                f"⚠️ Overspending Alert!\n\n"
+                f"• Average Daily Pace: ${v_ewma:.2f}/day\n"
+                f"• Estimated Total Fortnight Spend: ${e_projected:.2f}\n"
+                f"• Projected Shortfall: ${deficit:.2f}\n\n"
+                f"Suggested Daily Spend Limit: ${safe_daily_limit:.2f}/day"
             )
-            return False, msg
+            return False, warning_msg
 
         return True, ""
-
-    def open_emergency_vault_dialog(self):
-        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
-        total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
-        rem_savings = (self.total_budget + total_income) - total_expenses
-
-        dlg = EmergencyFundDialog(self.emergency_vault, rem_savings, self)
-        if dlg.exec_() == QDialog.Accepted:
-            self.emergency_vault = dlg.get_fund()
-            self.save_state()
 
     def open_add_transaction_dialog(self):
         dialog = AddTransactionDialog(self)
@@ -1004,7 +852,7 @@ class home(QWidget):
                 if not safe:
                     box = QMessageBox.warning(
                         self, 
-                        "🤖 AI SafeSpend Warning", 
+                        "Smart Budget Alert", 
                         f"{warning_msg}\n\nDo you still want to log this expense?",
                         QMessageBox.Yes | QMessageBox.No
                     )
@@ -1016,12 +864,32 @@ class home(QWidget):
             self.recalculate_totals()
             self.save_state()
 
+    def open_work_calendar_dialog(self):
+        dlg = WorkCalendarDialog(self.work_days, self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.work_days = dlg.get_work_days()
+            self.recalculate_totals()
+            self.save_state()
+
+    def open_emergency_vault_dialog(self):
+        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+        total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
+        rem_savings = (self.total_budget + total_income) - total_expenses
+
+        dlg = EmergencyFundDialog(self.emergency_vault, rem_savings, self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.emergency_vault = dlg.get_fund()
+            self.save_state()
+
     def open_set_wage_dialog(self):
         dlg = SetWageDialog(self.hourly_wage, self.hours_per_shift, self)
         if dlg.exec_() == QDialog.Accepted:
             self.hourly_wage, self.hours_per_shift = dlg.get_details()
             self.recalculate_totals()
             self.save_state()
+
+    def open_upgrade_dialog(self):
+        webbrowser.open("https://agent-6a78ae13c56797ee63e8e2a7--budgetwizardai.netlify.app/")
 
     def open_currency_converter(self):
         dlg = CurrencyConverterDialog(self.selected_country, self)
@@ -1032,7 +900,21 @@ class home(QWidget):
         if dlg.exec_() == QDialog.Accepted:
             self.save_state()
 
+    def on_country_changed(self, text):
+        self.selected_country = text
+        self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
+        self.save_state()
+
+    def trigger_fortnight_reset(self):
+        self.transactions_data = []
+        self.work_days = []
+        self.fortnight_start_date = QDate.currentDate()
+        self.populate_table()
+        self.recalculate_totals()
+        self.save_state()
+
     def get_report_data(self):
+        """Returns total budget and full transaction history for Financial Reports."""
         all_transactions = self.history_data + self.transactions_data
         return self.total_budget, all_transactions
 
