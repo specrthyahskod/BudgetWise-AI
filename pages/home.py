@@ -1,12 +1,18 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QPushButton,
-    QDialog, QLineEdit, QComboBox, QDateEdit, QMessageBox
+    QDialog, QLineEdit, QComboBox, QDateEdit, QMessageBox, QCalendarWidget
 )
 from PyQt5.QtCore import Qt, QDate, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
-from utils.manager import ThemeManager
+from PyQt5.QtGui import QFont, QColor, QTextCharFormat
 
+from utils.manager import ThemeManager
+from utils.user_data_manager import UserDataManager
+from models.ai_engine import StudentAIEngine
+from models.fin_math_model import finance_calc
+
+ai_engine = StudentAIEngine()
+math_engine = finance_calc(total_fortnight_days=14)
 
 COUNTRY_DATA = {
     "India 🇮🇳": {"currency": "INR (₹)", "rate": 55.50},
@@ -18,6 +24,143 @@ COUNTRY_DATA = {
     "Philippines 🇵🇭": {"currency": "PHP (₱)", "rate": 38.20},
     "Malaysia 🇲🇾": {"currency": "MYR (RM)", "rate": 3.10}
 }
+
+class WorkCalendarDialog(QDialog):
+    def __init__(self, work_days, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Work Shift Calendar")
+        self.setFixedSize(420, 500)
+        self.setStyleSheet("background-color: #0F172A; color: #F8FAFC;")
+        self.work_days = set(work_days)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
+
+        title = QLabel("📅 Work Shift Tracker")
+        title.setFont(QFont("Segoe UI", 13, QFont.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.calendar = QCalendarWidget()
+        self.calendar.setGridVisible(False)
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+        
+        self.calendar.setStyleSheet("""
+            QCalendarWidget {
+                background-color: #1E293B;
+                border: 1px solid #334155;
+                border-radius: 10px;
+            }
+            QCalendarWidget QWidget#qt_calendar_navigationbar {
+                background-color: #0F172A;
+                border-bottom: 1px solid #334155;
+            }
+            QCalendarWidget QToolButton {
+                color: #F8FAFC;
+                background-color: transparent;
+                font-weight: bold;
+                border-radius: 4px;
+            }
+            QCalendarWidget QToolButton:hover {
+                background-color: #334155;
+            }
+            QCalendarWidget QMenu {
+                background-color: #1E293B;
+                color: #F8FAFC;
+            }
+            QCalendarWidget QSpinBox {
+                color: #F8FAFC;
+                background-color: #0F172A;
+                selection-background-color: #2563EB;
+            }
+            QCalendarWidget QTableView {
+                background-color: #1E293B;
+                color: #F8FAFC;
+                selection-background-color: #2563EB;
+                selection-color: #FFFFFF;
+                gridline-color: #334155;
+            }
+            QCalendarWidget QHeaderView::section {
+                background-color: #0F172A;
+                color: #94A3B8;
+                font-weight: bold;
+                border: none;
+                padding: 4px;
+            }
+        """)
+
+        self.highlight_format = QTextCharFormat()
+        self.highlight_format.setBackground(QColor("#16A34A"))
+        self.highlight_format.setForeground(QColor("#FFFFFF"))
+
+        self.normal_format = QTextCharFormat()
+
+        self.status_label = QLabel("")
+        self.status_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        self.status_label.setStyleSheet("color: #60A5FA;")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        btn_toggle = QPushButton("Mark / Unmark Date Worked")
+        btn_toggle.setFixedHeight(38)
+        btn_toggle.setStyleSheet("""
+            QPushButton {
+                background-color: #2563EB;
+                color: white;
+                font-weight: bold;
+                border-radius: 6px;
+                border: none;
+            }
+            QPushButton:hover { background-color: #1D4ED8; }
+        """)
+        btn_toggle.clicked.connect(self.toggle_selected_date)
+
+        btn_save = QPushButton("Save & Update Budget")
+        btn_save.setFixedHeight(38)
+        btn_save.setStyleSheet("""
+            QPushButton {
+                background-color: #16A34A;
+                color: white;
+                font-weight: bold;
+                border-radius: 6px;
+                border: none;
+            }
+            QPushButton:hover { background-color: #15803D; }
+        """)
+        btn_save.clicked.connect(self.accept)
+
+        layout.addWidget(title)
+        layout.addWidget(self.calendar)
+        layout.addWidget(btn_toggle)
+        layout.addWidget(self.status_label)
+        layout.addWidget(btn_save)
+
+        self.setLayout(layout)
+        self.apply_calendar_highlights()
+
+    def apply_calendar_highlights(self):
+        for date_str in self.work_days:
+            qdate = QDate.fromString(date_str, "yyyy-MM-dd")
+            self.calendar.setDateTextFormat(qdate, self.highlight_format)
+        
+        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
+
+    def toggle_selected_date(self):
+        selected_qdate = self.calendar.selectedDate()
+        date_str = selected_qdate.toString("yyyy-MM-dd")
+
+        if date_str in self.work_days:
+            self.work_days.remove(date_str)
+            self.calendar.setDateTextFormat(selected_qdate, self.normal_format)
+        else:
+            self.work_days.add(date_str)
+            self.calendar.setDateTextFormat(selected_qdate, self.highlight_format)
+
+        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
+
+    def get_work_days(self):
+        return list(self.work_days)
 
 
 class EmergencyFundDialog(QDialog):
@@ -35,7 +178,7 @@ class EmergencyFundDialog(QDialog):
         layout.setSpacing(10)
 
         title = QLabel("🛡️ Emergency Fund Vault")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.info_label = QLabel(f"Vault Balance: ${self.current_fund:.2f}\nFortnight Savings: ${self.remaining_savings:.2f}")
@@ -47,12 +190,12 @@ class EmergencyFundDialog(QDialog):
 
         btn_deposit = QPushButton("Deposit to Vault")
         btn_deposit.setFixedHeight(34)
-        btn_deposit.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold;")
+        btn_deposit.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold; border: none;")
         btn_deposit.clicked.connect(self.deposit)
 
         btn_withdraw = QPushButton("Withdraw Emergency Funds")
         btn_withdraw.setFixedHeight(34)
-        btn_withdraw.setStyleSheet("background-color: #DC2626; color: white; font-weight: bold;")
+        btn_withdraw.setStyleSheet("background-color: #DC2626; color: white; font-weight: bold; border: none;")
         btn_withdraw.clicked.connect(self.withdraw)
 
         layout.addWidget(title)
@@ -110,7 +253,7 @@ class CurrencyConverterDialog(QDialog):
         layout.setSpacing(10)
 
         title = QLabel("🔀 AUD Converter")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.aud_input = QLineEdit()
@@ -124,13 +267,13 @@ class CurrencyConverterDialog(QDialog):
         self.country_combo.setFixedHeight(34)
 
         self.result_label = QLabel("Converted: ---")
-        self.result_label.setFont(QFont("Arial", 11, QFont.Bold))
+        self.result_label.setFont(QFont("Segoe UI", 11, QFont.Bold))
         self.result_label.setStyleSheet("color: #2563EB;")
         self.result_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         calc_btn = QPushButton("Convert")
         calc_btn.setFixedHeight(36)
-        calc_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px;")
+        calc_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px; border: none;")
         calc_btn.clicked.connect(self.calculate_conversion)
 
         layout.addWidget(title)
@@ -175,7 +318,7 @@ class VisaWorkTrackerDialog(QDialog):
         layout.setSpacing(10)
 
         title = QLabel("⏱️ Visa Work Tracker")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.w1_input = QLineEdit()
@@ -189,12 +332,12 @@ class VisaWorkTrackerDialog(QDialog):
         self.w2_input.setFixedHeight(34)
 
         self.status_label = QLabel(f"Limit: 48 hrs / fortnight | Pay: ${self.hourly_wage:.2f}/hr")
-        self.status_label.setFont(QFont("Arial", 9, QFont.Bold))
+        self.status_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         check_btn = QPushButton("Update Work Hours")
         check_btn.setFixedHeight(36)
-        check_btn.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold; border-radius: 6px;")
+        check_btn.setStyleSheet("background-color: #16A34A; color: white; font-weight: bold; border-radius: 6px; border: none;")
         check_btn.clicked.connect(self.check_compliance)
 
         layout.addWidget(title)
@@ -209,15 +352,8 @@ class VisaWorkTrackerDialog(QDialog):
         w1_text = self.w1_input.text().strip()
         w2_text = self.w2_input.text().strip()
         
-        if w1_text == "":
-            w1 = 0.0
-        else:
-            w1 = float(w1_text)
-
-        if w2_text == "":
-            w2 = 0.0
-        else:
-            w2 = float(w2_text)
+        w1 = float(w1_text) if w1_text != "" else 0.0
+        w2 = float(w2_text) if w2_text != "" else 0.0
 
         self.hours_worked = w1 + w2
         earnings = self.hours_worked * self.hourly_wage
@@ -236,19 +372,19 @@ class VisaWorkTrackerDialog(QDialog):
 
 
 class SetWageDialog(QDialog):
-    def __init__(self, current_wage, current_hours, parent=None):
+    def __init__(self, current_wage, current_shift_hours, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Set Wage & Hours")
+        self.setWindowTitle("Set Wage & Shift Details")
         self.setFixedSize(300, 220)
-        self.init_ui(current_wage, current_hours)
+        self.init_ui(current_wage, current_shift_hours)
 
-    def init_ui(self, current_wage, current_hours):
+    def init_ui(self, current_wage, current_shift_hours):
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
 
         title = QLabel("Input Work Details")
-        title.setFont(QFont("Arial", 12, QFont.Bold))
+        title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         layout.addWidget(title)
@@ -258,15 +394,15 @@ class SetWageDialog(QDialog):
         self.wage_input.setFixedHeight(34)
         layout.addWidget(self.wage_input)
 
-        layout.addWidget(QLabel("Fortnight Hours Worked:"))
+        layout.addWidget(QLabel("Hours Worked Per Shift:"))
         self.hours_input = QLineEdit()
-        self.hours_input.setText(str(current_hours))
+        self.hours_input.setText(str(current_shift_hours))
         self.hours_input.setFixedHeight(34)
         layout.addWidget(self.hours_input)
 
         save_btn = QPushButton("Save Details")
         save_btn.setFixedHeight(34)
-        save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px;")
+        save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px; border: none;")
         save_btn.clicked.connect(self.accept)
         layout.addWidget(save_btn)
 
@@ -283,7 +419,7 @@ class SetWageDialog(QDialog):
         try:
             h = float(h_text)
         except:
-            h = 48.0
+            h = 6.0
 
         return w, h
 
@@ -291,8 +427,8 @@ class SetWageDialog(QDialog):
 class AddTransactionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Log New Transaction")
-        self.setFixedSize(320, 380)
+        self.setWindowTitle("AI-Assisted Transaction Log")
+        self.setFixedSize(340, 400)
         self.init_ui()
 
     def init_ui(self):
@@ -301,39 +437,40 @@ class AddTransactionDialog(QDialog):
         layout.setSpacing(12)
 
         title = QLabel("Add Transaction")
-        title.setFont(QFont("Arial", 14, QFont.Bold))
+        title.setFont(QFont("Segoe UI", 14, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.date_input = QDateEdit()
         self.date_input.setDate(QDate.currentDate())
         self.date_input.setCalendarPopup(True)
-        self.date_input.setFixedHeight(36)
+        self.date_input.setFixedHeight(34)
 
         self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("Description (e.g. Coles Groceries)")
-        self.desc_input.setFixedHeight(36)
+        self.desc_input.setFixedHeight(34)
+        self.desc_input.textChanged.connect(self.auto_predict_category)
 
         self.category_combo = QComboBox()
         self.category_combo.addItems(["Food", "Education", "Transport", "Shopping", "Entertainment", "Income"])
-        self.category_combo.setFixedHeight(36)
+        self.category_combo.setFixedHeight(34)
+
+        self.ai_badge = QLabel("🤖 AI Category Predictor: Active")
+        self.ai_badge.setStyleSheet("color: #2563EB; font-size: 11px; font-weight: bold;")
 
         self.amount_input = QLineEdit()
         self.amount_input.setPlaceholderText("Amount ($)")
-        self.amount_input.setFixedHeight(36)
+        self.amount_input.setFixedHeight(34)
 
         self.error_label = QLabel("")
         self.error_label.setStyleSheet("color: #DC2626; font-size: 11px;")
         self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         btn_layout = QHBoxLayout()
-        
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedHeight(36)
         cancel_btn.clicked.connect(self.reject)
 
-        save_btn = QPushButton("Save")
-        save_btn.setFixedHeight(36)
-        save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border-radius: 6px;")
+        save_btn = QPushButton("Save Transaction")
+        save_btn.setStyleSheet("background-color: #2563EB; color: white; font-weight: bold; border: none;")
         save_btn.clicked.connect(self.validate_and_accept)
 
         btn_layout.addWidget(cancel_btn)
@@ -344,6 +481,7 @@ class AddTransactionDialog(QDialog):
         layout.addWidget(self.date_input)
         layout.addWidget(QLabel("Description:"))
         layout.addWidget(self.desc_input)
+        layout.addWidget(self.ai_badge)
         layout.addWidget(QLabel("Category:"))
         layout.addWidget(self.category_combo)
         layout.addWidget(QLabel("Amount ($):"))
@@ -352,6 +490,14 @@ class AddTransactionDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.setLayout(layout)
+
+    def auto_predict_category(self, text):
+        if len(text.strip()) > 2:
+            predicted = str(ai_engine.predict_category(text.strip()))
+            idx = self.category_combo.findText(predicted)
+            if idx != -1:
+                self.category_combo.setCurrentIndex(idx)
+                self.ai_badge.setText(f"🤖 AI Predicted Category: {predicted}")
 
     def validate_and_accept(self):
         desc = self.desc_input.text().strip()
@@ -378,11 +524,7 @@ class AddTransactionDialog(QDialog):
         category = self.category_combo.currentText()
         val = float(self.amount_input.text().strip())
         
-        if category == "Income":
-            formatted_amount = f"+${val:.2f}"
-        else:
-            formatted_amount = f"-${val:.2f}"
-
+        formatted_amount = f"+${val:.2f}" if category == "Income" else f"-${val:.2f}"
         return date_str, desc, category, formatted_amount, val
 
 
@@ -392,56 +534,76 @@ class home(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.username = "Student"
+        self.data_manager = UserDataManager()
+        self.user_data = self.data_manager.load_data()
+
+        self.username = self.user_data.get("username", "Student")
+        self.hourly_wage = self.user_data.get("hourly_wage", 26.44)
+        self.hours_per_shift = self.user_data.get("hours_per_shift", 6.0)
+        self.work_days = self.user_data.get("work_days", [])
         
-        self.hourly_wage = 26.44
-        self.fortnight_hours = 48.0
-        self.total_budget = self.hourly_wage * self.fortnight_hours
+        self.total_budget = len(self.work_days) * self.hours_per_shift * self.hourly_wage
         
-        self.emergency_vault = 300.00
-        self.selected_country = "India 🇮🇳"
+        self.emergency_vault = self.user_data.get("emergency_vault", 300.00)
+        self.selected_country = self.user_data.get("selected_country", "India 🇮🇳")
         
         self.fortnight_start_date = QDate.currentDate()
-        self.transactions_data = []
-        self.history_data = []
+        self.transactions_data = self.user_data.get("transactions", [])
+        self.history_data = self.user_data.get("history", [])
 
         self.init_ui()
 
+    def save_state(self):
+        self.user_data["username"] = self.username
+        self.user_data["hourly_wage"] = self.hourly_wage
+        self.user_data["hours_per_shift"] = self.hours_per_shift
+        self.user_data["emergency_vault"] = self.emergency_vault
+        self.user_data["selected_country"] = self.selected_country
+        self.user_data["work_days"] = self.work_days
+        self.user_data["transactions"] = self.transactions_data
+        self.user_data["history"] = self.history_data
+        self.data_manager.save_data(self.user_data)
+
     def init_ui(self):
+        self.setObjectName("HomeMainWidget")
+        self.setStyleSheet("QWidget#HomeMainWidget { background-color: #0F172A; }")
+
         root_layout = QHBoxLayout()
-        root_layout.setContentsMargins(0, 0, 0, 0)
-        root_layout.setSpacing(0)
+        root_layout.setContentsMargins(15, 15, 15, 15)
+        root_layout.setSpacing(15)
 
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(220)
         self.sidebar.setStyleSheet("""
             QFrame {
                 background-color: #1E293B;
-                border: none;
+                border-radius: 12px;
+                border: 1px solid #334155;
             }
             QLabel {
                 color: #F8FAFC;
             }
             QPushButton {
-                background-color: #334155;
+                background-color: #0F172A;
                 color: #F8FAFC;
-                border: none;
+                border: 1px solid #334155;
                 border-radius: 6px;
                 text-align: left;
                 padding-left: 12px;
-                font-weight: bold;
+                font-weight: 600;
             }
             QPushButton:hover {
                 background-color: #2563EB;
+                border-color: #2563EB;
             }
         """)
 
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(15, 20, 15, 20)
-        sidebar_layout.setSpacing(12)
+        sidebar_layout.setSpacing(10)
 
         sb_title = QLabel("⚙️ Settings & Tools")
-        sb_title.setFont(QFont("Arial", 12, QFont.Bold))
+        sb_title.setFont(QFont("Segoe UI", 12, QFont.Bold))
 
         btn_reports = QPushButton("📊 Financial Reports")
         btn_reports.setFixedHeight(36)
@@ -451,15 +613,15 @@ class home(QWidget):
         btn_calc.setFixedHeight(36)
         btn_calc.clicked.connect(self.open_calculator_signal.emit)
 
+        btn_calendar = QPushButton("📅 Work Calendar")
+        btn_calendar.setFixedHeight(36)
+        btn_calendar.clicked.connect(self.open_work_calendar_dialog)
+
         btn_vault = QPushButton("🛡️ Emergency Vault")
         btn_vault.setFixedHeight(36)
         btn_vault.clicked.connect(self.open_emergency_vault_dialog)
 
-        btn_theme = QPushButton("🌓 Toggle Theme")
-        btn_theme.setFixedHeight(36)
-        btn_theme.clicked.connect(self.toggle_app_theme)
-
-        btn_set_wage = QPushButton("💵 Set Wage & Hours")
+        btn_set_wage = QPushButton("💵 Set Wage & Shift")
         btn_set_wage.setFixedHeight(36)
         btn_set_wage.clicked.connect(self.open_set_wage_dialog)
 
@@ -468,20 +630,21 @@ class home(QWidget):
         btn_reset_fn.clicked.connect(self.trigger_fortnight_reset)
 
         country_label = QLabel("Origin Country:")
-        country_label.setFont(QFont("Arial", 9))
+        country_label.setFont(QFont("Segoe UI", 9))
 
         self.sidebar_country_combo = QComboBox()
         country_keys = list(COUNTRY_DATA.keys())
         self.sidebar_country_combo.addItems(country_keys)
+        self.sidebar_country_combo.setCurrentText(self.selected_country)
         self.sidebar_country_combo.setFixedHeight(32)
-        self.sidebar_country_combo.setStyleSheet("background-color: #334155; color: white; border-radius: 6px; padding: 4px;")
+        self.sidebar_country_combo.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 4px;")
         self.sidebar_country_combo.currentTextChanged.connect(self.on_country_changed)
 
         sidebar_layout.addWidget(sb_title)
         sidebar_layout.addWidget(btn_reports)
         sidebar_layout.addWidget(btn_calc)
+        sidebar_layout.addWidget(btn_calendar)
         sidebar_layout.addWidget(btn_vault)
-        sidebar_layout.addWidget(btn_theme)
         sidebar_layout.addWidget(btn_set_wage)
         sidebar_layout.addWidget(btn_reset_fn)
         sidebar_layout.addWidget(country_label)
@@ -489,41 +652,42 @@ class home(QWidget):
         sidebar_layout.addStretch()
 
         self.content_widget = QWidget()
+        self.content_widget.setStyleSheet("background-color: #0F172A;")
+
         main_layout = QVBoxLayout(self.content_widget)
-        main_layout.setContentsMargins(20, 15, 20, 15)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(15)
         main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         header_bar = QHBoxLayout()
+        header_bar.setSpacing(10)
         
         self.menu_btn = QPushButton("☰")
-        self.menu_btn.setFixedSize(36, 36)
-        self.menu_btn.setFont(QFont("Arial", 14, QFont.Bold))
-        self.menu_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.9);
-                border: 1px solid #CBD5E1;
-                border-radius: 8px;
-                color: #1E293B;
-            }
-            QPushButton:hover {
-                background-color: #E2E8F0;
-            }
-        """)
+        self.menu_btn.setFixedSize(40, 40)
+        self.menu_btn.setFont(QFont("Segoe UI", 12, QFont.Bold))
         self.menu_btn.clicked.connect(self.toggle_sidebar)
 
         welcome_card = QFrame()
-        welcome_card.setFixedHeight(75)
+        welcome_card.setFixedHeight(65)
+        welcome_card.setStyleSheet("""
+            QFrame {
+                background-color: rgba(30, 41, 59, 0.7);
+                border: 1px solid rgba(51, 65, 85, 0.8);
+                border-radius: 12px;
+            }
+        """)
 
         welcome_layout = QVBoxLayout(welcome_card)
-        welcome_layout.setContentsMargins(15, 10, 15, 10)
+        welcome_layout.setContentsMargins(15, 8, 15, 8)
         welcome_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.welcome_label = QLabel(f"Welcome back, {self.username}! 👋")
-        self.welcome_label.setFont(QFont("Arial", 16, QFont.Bold))
+        self.welcome_label.setFont(QFont("Segoe UI", 15, QFont.Bold))
+        self.welcome_label.setStyleSheet("color: #F8FAFC; background: transparent; border: none;")
 
         self.sub_label = QLabel("Fortnightly Cycle Active")
-        self.sub_label.setFont(QFont("Arial", 9))
+        self.sub_label.setFont(QFont("Segoe UI", 9))
+        self.sub_label.setStyleSheet("color: #94A3B8; background: transparent; border: none;")
 
         welcome_layout.addWidget(self.welcome_label)
         welcome_layout.addWidget(self.sub_label)
@@ -535,27 +699,27 @@ class home(QWidget):
         cards_layout.setSpacing(15)
 
         self.budget_box, self.lbl_budget_val, self.lbl_budget_sub = self.create_metric_card(
-            title="Fortnight Budget",
+            title="Accrued Budget",
             amount=f"${self.total_budget:.2f}",
-            subtitle=f"{self.fortnight_hours:.0f} hrs @ ${self.hourly_wage:.2f}/hr",
-            border_color="#2563EB",
-            text_color="#1E40AF"
+            subtitle=f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr",
+            border_color="rgba(59, 130, 246, 0.4)",
+            text_color="#60A5FA"
         )
 
         self.expenses_box, self.lbl_expenses_val, self.lbl_expenses_sub = self.create_metric_card(
             title="Fortnight Expenses",
             amount="$0.00",
             subtitle="0.0% of Budget",
-            border_color="#DC2626",
-            text_color="#991B1B"
+            border_color="rgba(239, 68, 68, 0.4)",
+            text_color="#F87171"
         )
 
         self.savings_box, self.lbl_savings_val, self.lbl_savings_sub = self.create_metric_card(
             title="Remaining Balance",
             amount=f"${self.total_budget:.2f}",
             subtitle="100.0% Remaining",
-            border_color="#16A34A",
-            text_color="#166534"
+            border_color="rgba(34, 197, 94, 0.4)",
+            text_color="#4ADE80"
         )
 
         cards_layout.addWidget(self.budget_box)
@@ -568,7 +732,7 @@ class home(QWidget):
         tools_layout.setContentsMargins(15, 5, 15, 5)
 
         tools_title = QLabel("🇦🇺 Student Tools:")
-        tools_title.setFont(QFont("Arial", 11, QFont.Bold))
+        tools_title.setFont(QFont("Segoe UI", 10, QFont.Bold))
 
         btn_currency = QPushButton(f"🔀 AUD Converter ({self.selected_country})")
         self.btn_currency_ref = btn_currency
@@ -588,20 +752,20 @@ class home(QWidget):
 
         t_header_layout = QHBoxLayout()
         tbl_title = QLabel("💳 Fortnight Transactions")
-        tbl_title.setFont(QFont("Arial", 13, QFont.Bold))
+        tbl_title.setFont(QFont("Segoe UI", 12, QFont.Bold))
 
         self.add_btn = QPushButton("+ Add Transaction")
-        self.add_btn.setFixedHeight(32)
+        self.add_btn.setFixedHeight(34)
         self.add_btn.setStyleSheet("""
             QPushButton {
                 background-color: #2563EB;
                 color: white;
                 font-weight: bold;
-                font-size: 11px;
                 border-radius: 6px;
-                padding: 0 12px;
+                padding: 0 14px;
                 border: none;
             }
+            QPushButton:hover { background-color: #1D4ED8; }
         """)
         self.add_btn.clicked.connect(self.open_add_transaction_dialog)
 
@@ -634,11 +798,18 @@ class home(QWidget):
         root_layout.addWidget(self.content_widget, 1)
 
         self.setLayout(root_layout)
+        ThemeManager.apply_dark_theme(self)
+
         self.check_auto_fortnight_reset()
+        self.populate_table()
         self.recalculate_totals()
 
-    def toggle_app_theme(self):
-        ThemeManager.toggle_theme(self)
+    def open_work_calendar_dialog(self):
+        dlg = WorkCalendarDialog(self.work_days, self)
+        if dlg.exec_() == QDialog.Accepted:
+            self.work_days = dlg.get_work_days()
+            self.recalculate_totals()
+            self.save_state()
 
     def check_auto_fortnight_reset(self):
         today = QDate.currentDate()
@@ -656,9 +827,11 @@ class home(QWidget):
                 self.history_data.append(item)
 
         self.transactions_data = []
+        self.work_days = []
         self.fortnight_start_date = QDate.currentDate()
         self.populate_table()
         self.recalculate_totals()
+        self.save_state()
         self.sub_label.setText("Fortnight Cycle Reset! Days remaining in fortnight: 14")
 
     def toggle_sidebar(self):
@@ -670,25 +843,44 @@ class home(QWidget):
     def on_country_changed(self, text):
         self.selected_country = text
         self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
+        self.save_state()
 
     def create_metric_card(self, title, amount, subtitle, border_color, text_color):
         card = QFrame()
-        card.setFixedHeight(120)
-        card.setStyleSheet(f"border-top: 5px solid {border_color};")
+        card.setFixedHeight(125)
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgba(30, 41, 59, 0.7);
+                border: 1px solid {border_color};
+                border-radius: 12px;
+            }}
+            QFrame:hover {{
+                background-color: rgba(30, 41, 59, 0.9);
+                border: 1px solid {text_color};
+            }}
+        """)
 
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(15, 12, 15, 12)
+        layout.setSpacing(4)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lbl_title = QLabel(title)
-        lbl_title.setFont(QFont("Arial", 11, QFont.Bold))
+        lbl_title.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        lbl_title.setStyleSheet("color: #94A3B8; background: transparent; border: none;")
 
         lbl_amount = QLabel(amount)
-        lbl_amount.setFont(QFont("Arial", 18, QFont.Bold))
-        lbl_amount.setStyleSheet(f"color: {text_color};")
+        lbl_amount.setFont(QFont("Segoe UI", 22, QFont.Bold))
+        lbl_amount.setStyleSheet(f"""
+            color: {text_color};
+            background: transparent;
+            border: none;
+            padding: 2px 0px;
+        """)
 
         lbl_sub = QLabel(subtitle)
-        lbl_sub.setFont(QFont("Arial", 9))
+        lbl_sub.setFont(QFont("Segoe UI", 8))
+        lbl_sub.setStyleSheet("color: #64748B; background: transparent; border: none;")
 
         layout.addWidget(lbl_title)
         layout.addWidget(lbl_amount)
@@ -714,9 +906,9 @@ class home(QWidget):
             amount_item.setTextAlignment(int(Qt.AlignRight | Qt.AlignVCenter))
 
             if cat == "Income":
-                amount_item.setForeground(QColor("#16A34A"))
+                amount_item.setForeground(QColor("#22C55E"))
             else:
-                amount_item.setForeground(QColor("#DC2626"))
+                amount_item.setForeground(QColor("#EF4444"))
 
             self.transactions_table.setItem(row_idx, 0, date_item)
             self.transactions_table.setItem(row_idx, 1, desc_item)
@@ -735,7 +927,7 @@ class home(QWidget):
             else:
                 total_expenses = total_expenses + val
 
-        self.total_budget = self.hourly_wage * self.fortnight_hours
+        self.total_budget = len(self.work_days) * self.hours_per_shift * self.hourly_wage
         effective_budget = self.total_budget + total_income
         total_savings = effective_budget - total_expenses
 
@@ -747,7 +939,7 @@ class home(QWidget):
             savings_pct = 0.0
 
         self.lbl_budget_val.setText(f"${effective_budget:,.2f}")
-        self.lbl_budget_sub.setText(f"{self.fortnight_hours:.0f} hrs @ ${self.hourly_wage:.2f}/hr")
+        self.lbl_budget_sub.setText(f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr")
 
         self.lbl_expenses_val.setText(f"${total_expenses:,.2f}")
         self.lbl_expenses_sub.setText(f"{expense_pct:.1f}% of Budget")
@@ -756,19 +948,34 @@ class home(QWidget):
         self.lbl_savings_sub.setText(f"{savings_pct:.1f}% Remaining")
 
     def run_ai_safespend_check(self, expense_val):
-        total_expenses = 0.0
+        today = QDate.currentDate()
+        days_passed = max(self.fortnight_start_date.daysTo(today), 1)
+
+        daily_expenses = {}
         for item in self.transactions_data:
             if item[2] != "Income":
-                total_expenses = total_expenses + item[4]
+                tx_date = QDate.fromString(item[0], "yyyy-MM-dd")
+                day_num = max(self.fortnight_start_date.daysTo(tx_date), 1)
+                daily_expenses[day_num] = daily_expenses.get(day_num, 0.0) + item[4]
 
-        remaining_savings = self.total_budget - total_expenses
+        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+        
+        forecast = math_engine.forecast_end_of_fortnight(
+            current_day=days_passed,
+            current_expenses=total_expenses + expense_val,
+            accrued_budget=self.total_budget,
+            daily_expenses_dict=daily_expenses
+        )
 
-        if remaining_savings <= 0:
-            return False, "You have exhausted your budget! Logging this expense will put you in debt."
-
-        limit_threshold = remaining_savings * 0.40
-        if expense_val > limit_threshold:
-            return False, f"⚠️ AI Warning: This spend (${expense_val:.2f}) consumes over 40% of your remaining savings (${remaining_savings:.2f})."
+        if not forecast["is_solvent"]:
+            msg = (
+                f"⚠️ FINANCIAL MODEL WARNING:\n\n"
+                f"Current Daily Burn Rate: ${forecast['burn_rate_per_day']:.2f}/day\n"
+                f"Projected Fortnight Spend: ${forecast['projected_total_expense']:.2f}\n"
+                f"Projected Deficit: ${forecast['projected_deficit']:.2f}\n\n"
+                f"Recommended Safe Limit: ${forecast['safe_daily_limit']:.2f}/day"
+            )
+            return False, msg
 
         return True, ""
 
@@ -780,11 +987,15 @@ class home(QWidget):
         dlg = EmergencyFundDialog(self.emergency_vault, rem_savings, self)
         if dlg.exec_() == QDialog.Accepted:
             self.emergency_vault = dlg.get_fund()
+            self.save_state()
 
     def open_add_transaction_dialog(self):
         dialog = AddTransactionDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             new_entry = dialog.get_data()
+            if new_entry is None:
+                return
+
             cat = new_entry[2]
             val = new_entry[4]
 
@@ -803,22 +1014,23 @@ class home(QWidget):
             self.transactions_data.insert(0, new_entry)
             self.populate_table()
             self.recalculate_totals()
+            self.save_state()
 
     def open_set_wage_dialog(self):
-        dlg = SetWageDialog(self.hourly_wage, self.fortnight_hours, self)
+        dlg = SetWageDialog(self.hourly_wage, self.hours_per_shift, self)
         if dlg.exec_() == QDialog.Accepted:
-            self.hourly_wage, self.fortnight_hours = dlg.get_details()
+            self.hourly_wage, self.hours_per_shift = dlg.get_details()
             self.recalculate_totals()
+            self.save_state()
 
     def open_currency_converter(self):
         dlg = CurrencyConverterDialog(self.selected_country, self)
         dlg.exec_()
 
     def open_visa_tracker(self):
-        dlg = VisaWorkTrackerDialog(self.hourly_wage, self.fortnight_hours, self)
+        dlg = VisaWorkTrackerDialog(self.hourly_wage, len(self.work_days) * self.hours_per_shift, self)
         if dlg.exec_() == QDialog.Accepted:
-            self.fortnight_hours = dlg.get_hours()
-            self.recalculate_totals()
+            self.save_state()
 
     def get_report_data(self):
         all_transactions = self.history_data + self.transactions_data
@@ -827,3 +1039,4 @@ class home(QWidget):
     def set_username(self, username):
         self.username = username
         self.welcome_label.setText(f"Welcome back, {self.username}! 👋")
+        self.save_state()
