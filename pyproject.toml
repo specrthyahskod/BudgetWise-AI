@@ -1,3 +1,8 @@
+[tool.briefcase]
+project_name = "BudgetWise AI"
+bundle = "com.budgetwise"
+version = "0.0.1"
+
 [tool.briefcase.app.budgetwiseai]
 formal_name = "BudgetWise AI"
 description = "Your AI-powered student finance companion"
