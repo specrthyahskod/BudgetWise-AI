@@ -6,14 +6,14 @@ title = BudgetWise AI
 # (str) Package name
 package.name = budgetwiseai
 
-# (str) Package domain (needed for android/ios packaging)
+# (str) Package domain
 package.domain = org.budgetwise
 
-# (str) Source code where the main.py lives
+# (str) Source code where main.py lives
 source.dir = .
 
-# (list) Source files to include (file extensions)
-source.include_exts = py,png,jpg,kv,atlas,json,svg
+# (list) Source files to include
+source.include_exts = py,png,jpg,kv,atlas,json,svg,txt
 
 # (str) Application version number
 version = 0.1
@@ -21,19 +21,34 @@ version = 0.1
 # (list) Application requirements
 requirements = python3,kivy,requests
 
-# (str) Supported orientation (landscape, sensorLandscape, portrait or all)
+# (str) Application icon filename
+icon.filename = %(source.dir)s/assets/BudgetWise_AI_logo.png
+
+# (str) Supported orientation
 orientation = portrait
 
-# (bool) Indicate if the application should be fullscreen or not
+# (bool) Fullscreen or not
 fullscreen = 0
 
 # (list) Permissions
 permissions = INTERNET
 
+# (bool) Automatically accept SDK licenses in CI environments
+android.accept_sdk_license = True
+
+# (str) Android NDK version
+android.ndk = 25b
+
+# (int) Target Android API
+android.api = 33
+
+# (int) Minimum API supported
+android.minapi = 21
+
 [buildozer]
 
-# (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
+# (int) Log level
 log_level = 2
 
-# (int) Display warning if buildozer is run as root (0 = false, 1 = true)
+# (int) Display warning if run as root
 warn_on_root = 1

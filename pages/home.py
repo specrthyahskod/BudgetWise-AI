@@ -914,7 +914,6 @@ class home(QWidget):
         self.save_state()
 
     def get_report_data(self):
-        """Returns total budget and full transaction history for Financial Reports."""
         all_transactions = self.history_data + self.transactions_data
         return self.total_budget, all_transactions
 

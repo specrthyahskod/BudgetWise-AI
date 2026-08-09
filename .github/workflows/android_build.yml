@@ -32,15 +32,9 @@ jobs:
         pip install --upgrade pip
         pip install --upgrade buildozer cython
 
-    - name: Pre-accept Android SDK Licenses & Run Buildozer
+    - name: Build APK with Buildozer
       run: |
-        # Pre-create SDK licenses directory to prevent sdkmanager prompts
-        SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
-        mkdir -p "$SDK_DIR/licenses"
-        echo -e "\n8933010224545813973e16f7be49cb28048d6b15\nd56f5187479451eabf01fb78af6dfcb131a6481e\n24333f8a63b6825ea9c5514f83c2829b004d1fee" > "$SDK_DIR/licenses/android-sdk-license"
-        
-        # Run Buildozer in batch mode
-        yes | buildozer -v android debug
+        buildozer -v android debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
