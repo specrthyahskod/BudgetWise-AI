@@ -1,0 +1,50 @@
+{
+    "username": "Riddhiman Datta",
+    "hourly_wage": 26.66,
+    "fortnight_hours": 48.0,
+    "emergency_vault": 1884.0,
+    "selected_country": "India \ud83c\uddee\ud83c\uddf3",
+    "transactions": [
+        [
+            "2026-08-09",
+            "Netflix",
+            "Entertainment",
+            "-$19.99",
+            19.99
+        ],
+        [
+            "2026-08-08",
+            "Books and Utilities",
+            "Education",
+            "-$11.22",
+            11.22
+        ],
+        [
+            "2027-08-07",
+            "takeaway order",
+            "Food",
+            "-$28.85",
+            28.85
+        ],
+        [
+            "2026-08-07",
+            "Rent",
+            "Education",
+            "-$343.00",
+            343.0
+        ]
+    ],
+    "history": [],
+    "work_days": [
+        "2026-08-02",
+        "2026-08-08",
+        "2026-08-09",
+        "2026-08-05",
+        "2026-08-01",
+        "2026-08-04",
+        "2026-08-07",
+        "2026-08-06",
+        "2026-08-03"
+    ],
+    "hours_per_shift": 3.5
+}

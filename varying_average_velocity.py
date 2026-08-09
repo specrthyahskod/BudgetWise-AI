@@ -13,7 +13,6 @@ def calculate_ewma(samples: List[float], alpha: float = 0.3) -> float:
 
     return ewma
 
-
 def calculate_projected_energy(
     e_current: float,
     t_current: float,
