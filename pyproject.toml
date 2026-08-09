@@ -13,14 +13,9 @@ author = "Riddhiman"
 formal_name = "BudgetWise AI"
 description = "Your AI-powered student finance companion"
 icon = "assets/BudgetWise_AI_logo"
+main_module = "main"
 sources = [
-    "main.py",
-    "pages",
-    "models",
-    "utils",
-    "assets",
-    "services",
-    "widgets"
+    ".",
 ]
 requires = [
     "PyQt5",
@@ -28,4 +23,4 @@ requires = [
 ]
 
 [tool.briefcase.app.budgetwiseai.android]
-build_style = "aab"
+build_style = "apk"
