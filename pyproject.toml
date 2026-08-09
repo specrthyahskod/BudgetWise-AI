@@ -1,26 +1,12 @@
-[build-system]
-requires = ["briefcase"]
-
-[tool.briefcase]
-project_name = "BudgetWise AI"
-bundle = "org.budgetwise"
-version = "0.1"
-url = "https://github.com/specrthyahskod/BudgetWise-AI"
-license = "MIT"
-author = "Riddhiman"
-
 [tool.briefcase.app.budgetwiseai]
 formal_name = "BudgetWise AI"
 description = "Your AI-powered student finance companion"
 icon = "assets/BudgetWise_AI_logo"
-main_module = "main"
+main_module = "budgetwiseai.main"  # Update this too
 sources = [
-    ".",
+    "budgetwiseai",
 ]
 requires = [
     "PyQt5",
     "requests"
 ]
-
-[tool.briefcase.app.budgetwiseai.android]
-build_style = "apk"
