@@ -86,7 +86,7 @@ class BudgetWiseApp(QWidget):
         copyright_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         copyright_label.setStyleSheet("color: #4B5563; font-weight: bold;")
 
-        legal_label = QLabel("Privacy Policy  |  Terms of Service  |  Educational Purpose Only  |  Contact Support")
+        legal_label = QLabel("This is an educational project, we'll add some ToS and Privacy n Policy later.")
         legal_label.setFont(QFont("Arial", 8))
         legal_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         legal_label.setStyleSheet("color: #6B7280;")
