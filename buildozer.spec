@@ -36,6 +36,9 @@ permissions = INTERNET
 # (bool) Automatically accept SDK licenses in CI environments
 android.accept_sdk_license = True
 
+# (str) Target Architecture (Set to single target for reliable CI compilation)
+android.archs = arm64-v8a
+
 # (str) Android NDK version
 android.ndk = 25b
 
