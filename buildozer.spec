@@ -15,8 +15,11 @@ source.dir = .
 # (list) Source files to include (file extensions)
 source.include_exts = py,png,jpg,kv,atlas,json,svg
 
+# (str) Application version number
+version = 0.1
+
 # (list) Application requirements
-requirements = python3,kivy,requests,pyqt5
+requirements = python3,kivy,requests
 
 # (str) Supported orientation (landscape, sensorLandscape, portrait or all)
 orientation = portrait
