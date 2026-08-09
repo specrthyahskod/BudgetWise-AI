@@ -131,7 +131,6 @@ class BudgetWiseApp(QWidget):
 def main():
     app = QApplication(sys.argv)
 
-    # Set Application-wide Icon
     icon_path = get_asset_path("BudgetWise_AI_logo.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
