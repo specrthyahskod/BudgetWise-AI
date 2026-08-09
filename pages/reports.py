@@ -65,10 +65,12 @@ class FinancialReportPage(QWidget):
         self.total_budget = total_budget
         self.transactions = transactions
 
-        for i in reversed(range(self.card_layout.count())):
-            widget = self.card_layout.itemAt(i).widget()
-            if widget:
-                widget.setParent(None)
+        # Safely clear existing layout items and free memory
+        while self.card_layout.count():
+            item = self.card_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
 
         total_income = 0.0
         total_expenses = 0.0
