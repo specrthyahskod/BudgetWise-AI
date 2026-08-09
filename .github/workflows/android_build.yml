@@ -34,6 +34,8 @@ jobs:
 
     - name: Build APK with Buildozer
       run: |
+        # Clear GitHub runner NDK environment variables that conflict with Buildozer
+        unset ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK
         buildozer -v android debug
 
     - name: Upload APK Artifact
