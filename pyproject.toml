@@ -13,7 +13,6 @@ author = "Riddhiman"
 formal_name = "BudgetWise AI"
 description = "Your AI-powered student finance companion"
 icon = "assets/BudgetWise_AI_logo"
-main_module = "budgetwiseai.app"
 sources = [
     "budgetwiseai",
     "assets"
