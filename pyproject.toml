@@ -1,45 +1,14 @@
-[build-system]
-requires = ["briefcase"]
-
-[tool.briefcase]
-project_name = "BudgetWise-AI"
-bundle = "org.budgetwise"
-version = "0.1"
-url = "https://github.com/specrthyahskod/BudgetWise-AI"
-license = "MIT"
-author = "Riddhiman"
-
 [tool.briefcase.app.budgetwiseai]
 formal_name = "BudgetWise AI"
 description = "Your AI-powered student finance companion"
 icon = "assets/BudgetWise_AI_logo"
-main_module = "main"
+main_module = "budgetwiseai"
 sources = [
-    "__init__.py",
-    "main.py",
-    "fiance_training_model.py",
-    "training_input_data.py",
-    "varying_average_velocity.py",
-    "user_data.json",
-    "users.xlsx",
-    "assets",
-    "database",
-    "models",
-    "pages",
-    "services",
-    "utils",
-    "widgets"
+    "budgetwiseai",
+    "assets"
 ]
 requires = [
     "PyQt5",
     "requests",
     "openpyxl"
-]
-
-[tool.briefcase.app.budgetwiseai.android]
-build_style = "apk"
-build_gradle_dependencies = [
-    "androidx.appcompat:appcompat:1.0.2",
-    "androidx.constraintlayout:constraintlayout:1.1.3",
-    "androidx.swiperefreshlayout:swiperefreshlayout:1.1.0"
 ]
