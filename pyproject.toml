@@ -2,7 +2,7 @@
 requires = ["briefcase"]
 
 [tool.briefcase]
-project_name = "BudgetWise AI"
+project_name = "BudgetWise-AI"
 bundle = "org.budgetwise"
 version = "0.1"
 url = "https://github.com/specrthyahskod/BudgetWise-AI"
