@@ -1,3 +1,5 @@
+import sys
+import io
 import socket
 import threading
 import time
@@ -9,6 +11,10 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from openpyxl import load_workbook
+
+# Force UTF-8 on Windows stdout/stderr to prevent CP1252 character map crashes
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
 HOST = "127.0.0.1"
 PORT = 9999
@@ -49,14 +55,14 @@ def save_idi_sessions(sessions):
 
 def send_idi_email(recipient_email: str, token: str) -> bool:
     try:
-        subject = "🔒 BudgetWise AI — Socket IDI Security Token"
+        subject = "BudgetWise AI -- Socket IDI Security Token"
         
         # HTML Email Body
         html_content = f"""
         <html>
             <body style="font-family: Arial, sans-serif; background-color: #0F172A; color: #F8FAFC; padding: 20px;">
                 <div style="max-width: 550px; margin: auto; background-color: #1E293B; padding: 25px; border-radius: 12px; border: 1px solid #334155;">
-                    <h2 style="color: #60A5FA; margin-top: 0;">💰 BudgetWise AI</h2>
+                    <h2 style="color: #60A5FA; margin-top: 0;">BudgetWise AI</h2>
                     <h3 style="color: #F8FAFC;">Password Reset Verification Token</h3>
                     <p style="color: #94A3B8; font-size: 14px;">
                         A password reset request was initiated for your account. Please provide the following 256-bit encrypted session hash code to the administrator or staff intranet portal:
@@ -67,7 +73,7 @@ def send_idi_email(recipient_email: str, token: str) -> bool:
                     </div>
 
                     <p style="color: #F87171; font-size: 12px; font-weight: bold;">
-                        ⏱️ Warning: This security code is valid for exactly 5 minutes (300 seconds).
+                        Warning: This security code is valid for exactly 5 minutes (300 seconds).
                     </p>
                     <hr style="border: 0; border-top: 1px solid #334155; margin: 20px 0;">
                     <p style="color: #64748B; font-size: 11px; text-align: center;">
@@ -89,10 +95,10 @@ def send_idi_email(recipient_email: str, token: str) -> bool:
             server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
             server.sendmail(SENDER_EMAIL, recipient_email, msg.as_string())
 
-        print(f"📧 IDI Security token successfully mailed to {recipient_email}")
+        print(f"[Email Dispatch] IDI Security token successfully mailed to {recipient_email}")
         return True
     except Exception as e:
-        print(f"❌ Failed to dispatch email: {e}")
+        print(f"[Email Error] Failed to dispatch email: {e}")
         return False
 
 
@@ -115,6 +121,7 @@ def generate_idi_token(email: str) -> str:
     save_idi_sessions(sessions)
     send_idi_email(email, token_256bit)
     return token_256bit
+
 
 def update_excel_password(email_or_user: str, new_password: str) -> bool:
     if not os.path.exists(USERS_XLSX_FILE):
@@ -225,7 +232,7 @@ def start_socket_idi_server():
     server.bind((HOST, PORT))
     server.listen(5)
     
-    print(f"🔒 [Socket IDI Intranet Daemon Active] Listening on {HOST}:{PORT}")
+    print(f"[Socket IDI Daemon Active] Listening on {HOST}:{PORT}")
     
     while True:
         client_sock, addr = server.accept()
