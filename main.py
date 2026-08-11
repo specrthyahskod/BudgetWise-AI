@@ -74,6 +74,8 @@ class BudgetWiseApp(QWidget):
         self.home_page.open_calculator_signal.connect(lambda: self.switch_page(5))
         self.calc_page.back_btn.clicked.connect(lambda: self.switch_page(1))
 
+        self.home_page.logout_signal.connect(self.handle_logout)
+
         self.footer_container = QWidget()
         footer_layout = QVBoxLayout(self.footer_container)
         footer_layout.setContentsMargins(10, 5, 10, 10)
@@ -93,7 +95,6 @@ class BudgetWiseApp(QWidget):
         self.switch_page(0)
 
     def apply_window_background(self, is_logged_in):
-        """Shows background image during login/signup, and dark theme when logged in."""
         palette = self.palette()
         if is_logged_in:
             palette.setColor(QPalette.Window, QColor("#0F172A"))
@@ -140,13 +141,17 @@ class BudgetWiseApp(QWidget):
         self.report_page.update_report(budget, transactions)
         self.switch_page(4)
 
+    def handle_logout(self):
+        if hasattr(self.login_widget, "reset_fields"):
+            self.login_widget.reset_fields()
+        self.switch_page(0)
+
 
 def main():
-    app = QApplication(sys.argv)
-    window = BudgetWiseApp()
-    window.show()
-    sys.exit(app.exec_())
-
+        app = QApplication(sys.argv)
+        window = BudgetWiseApp()
+        window.show()
+        sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    main()
+    main()  

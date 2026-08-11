@@ -1,5 +1,5 @@
 {
-    "username": "Riddhiman Datta",
+    "username": "lunarlord74",
     "hourly_wage": 26.66,
     "fortnight_hours": 48.0,
     "emergency_vault": 1884.0,
@@ -36,15 +36,116 @@
     ],
     "history": [],
     "work_days": [
+        "2026-08-07",
         "2026-08-02",
+        "2026-08-10",
+        "2026-08-05",
+        "2026-08-04",
+        "2026-08-03",
         "2026-08-08",
         "2026-08-09",
-        "2026-08-05",
         "2026-08-01",
-        "2026-08-04",
-        "2026-08-07",
-        "2026-08-06",
-        "2026-08-03"
+        "2026-08-06"
     ],
-    "hours_per_shift": 3.5
+    "hours_per_shift": 3.5,
+    "Riddhiman Datta": {
+        "username": "Riddhiman Datta",
+        "password": "",
+        "hourly_wage": 26.44,
+        "hours_per_shift": 6.0,
+        "emergency_vault": 300.0,
+        "selected_country": "India \ud83c\uddee\ud83c\uddf3",
+        "profile_pic": "C:/Users/Riddhiman/Downloads/sonic-shadow-the-hedgehog-pfp-14.jpg",
+        "work_days": [
+            "2026-08-09",
+            "2026-08-12",
+            "2026-08-11",
+            "2026-08-10"
+        ],
+        "transactions": [
+            [
+                "2026-08-12",
+                "Food",
+                "Food",
+                "-$19.99",
+                19.99
+            ],
+            [
+                "2026-08-12",
+                "Books",
+                "Education",
+                "-$56.60",
+                56.6
+            ],
+            [
+                "2026-08-12",
+                "Netflix",
+                "Entertainment",
+                "-$19.99",
+                19.99
+            ],
+            [
+                "2026-08-12",
+                "Takeaway",
+                "Food",
+                "-$28.99",
+                28.99
+            ]
+        ],
+        "history": []
+    },
+    "lunarlord74": {
+        "username": "lunarlord74",
+        "password": "riddhiman@2009",
+        "hourly_wage": 26.44,
+        "hours_per_shift": 6.0,
+        "emergency_vault": 300.0,
+        "selected_country": "India \ud83c\uddee\ud83c\uddf3",
+        "profile_pic": "C:/Users/Riddhiman/Downloads/800px-Logo_of_the_Parachute_Regiment.png",
+        "work_days": [
+            "2026-08-12",
+            "2026-08-11",
+            "2026-08-13",
+            "2026-08-09",
+            "2026-08-10"
+        ],
+        "transactions": [
+            [
+                "2027-08-12",
+                "netflix (Monthly subscription)",
+                "Entertainment",
+                "-$29.99",
+                29.99
+            ],
+            [
+                "2026-08-12",
+                "Takeaway",
+                "Food",
+                "-$19.99",
+                19.99
+            ],
+            [
+                "2026-08-11",
+                "Bus fare",
+                "Transport",
+                "-$3.39",
+                3.39
+            ],
+            [
+                "2026-08-11",
+                "Food",
+                "Food",
+                "-$15.00",
+                15.0
+            ],
+            [
+                "2026-08-11",
+                "Games",
+                "Entertainment",
+                "-$19.99",
+                19.99
+            ]
+        ],
+        "history": []
+    }
 }

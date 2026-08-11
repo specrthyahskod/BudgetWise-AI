@@ -116,3 +116,9 @@ class Login(QWidget):
             self.login_successful.emit(response_data)
         else:
             self.error_label.setText(response_data)
+
+    def reset_fields(self):
+        self.username_input.clear()
+        self.password_input.clear()
+        if hasattr(self, 'error_label'):
+            self.error_label.setText("")

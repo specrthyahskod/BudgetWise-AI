@@ -1,11 +1,14 @@
+import os
+import sys
 import webbrowser
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QPushButton,
-    QDialog, QLineEdit, QComboBox, QDateEdit, QMessageBox, QCalendarWidget
+    QDialog, QLineEdit, QComboBox, QDateEdit, QMessageBox, QCalendarWidget,
+    QMenu, QFileDialog, QInputDialog
 )
-from PyQt5.QtCore import Qt, QDate, pyqtSignal
-from PyQt5.QtGui import QFont, QColor, QTextCharFormat
+from PyQt5.QtCore import Qt, QDate, pyqtSignal, QSize
+from PyQt5.QtGui import QFont, QColor, QTextCharFormat, QPixmap, QIcon
 
 from utils.manager import ThemeManager
 from utils.user_data_manager import UserDataManager
@@ -25,7 +28,6 @@ COUNTRY_DATA = {
 }
 
 def calculate_ewma(samples, alpha=0.35):
-    """Computes Exponentially Weighted Moving Average for spend velocity."""
     if not samples:
         return 0.0
     ewma = samples[0]
@@ -500,37 +502,79 @@ class AddTransactionDialog(QDialog):
 class home(QWidget):
     open_report_signal = pyqtSignal()
     open_calculator_signal = pyqtSignal()
+    logout_signal = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.data_manager = UserDataManager()
-        self.user_data = self.data_manager.load_data()
-
-        self.username = self.user_data.get("username", "Student")
-        self.hourly_wage = self.user_data.get("hourly_wage", 26.44)
-        self.hours_per_shift = self.user_data.get("hours_per_shift", 6.0)
-        self.work_days = self.user_data.get("work_days", [])
         
-        self.total_budget = len(self.work_days) * self.hours_per_shift * self.hourly_wage
-        self.emergency_vault = self.user_data.get("emergency_vault", 300.00)
-        self.selected_country = self.user_data.get("selected_country", "India 🇮🇳")
-        
+        self.username = "Student"
+        self.hourly_wage = 26.44
+        self.hours_per_shift = 6.0
+        self.work_days = []
+        self.total_budget = 0.0
+        self.emergency_vault = 300.00
+        self.selected_country = "India 🇮🇳"
+        self.profile_pic_path = ""
+        self.password = ""
         self.fortnight_start_date = QDate.currentDate()
-        self.transactions_data = self.user_data.get("transactions", [])
-        self.history_data = self.user_data.get("history", [])
+        self.transactions_data = []
+        self.history_data = []
 
         self.init_ui()
 
+    def set_username(self, username):
+        self.username = username
+        all_accounts = self.data_manager.load_data()
+        
+        if self.username in all_accounts:
+            user_info = all_accounts[self.username]
+            self.hourly_wage = user_info.get("hourly_wage", 26.44)
+            self.hours_per_shift = user_info.get("hours_per_shift", 6.0)
+            self.work_days = user_info.get("work_days", [])
+            self.emergency_vault = user_info.get("emergency_vault", 300.00)
+            self.selected_country = user_info.get("selected_country", "India 🇮🇳")
+            self.profile_pic_path = user_info.get("profile_pic", "")
+            self.password = user_info.get("password", "")
+            self.transactions_data = user_info.get("transactions", [])
+            self.history_data = user_info.get("history", [])
+        else:
+            self.hourly_wage = 26.44
+            self.hours_per_shift = 6.0
+            self.work_days = []
+            self.emergency_vault = 300.00
+            self.selected_country = "India 🇮🇳"
+            self.profile_pic_path = ""
+            self.password = ""
+            self.transactions_data = []
+            self.history_data = []
+
+        self.welcome_label.setText(f"Welcome back, {self.username}! 👋")
+        
+        idx = self.sidebar_country_combo.findText(self.selected_country)
+        if idx != -1:
+            self.sidebar_country_combo.setCurrentIndex(idx)
+        self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
+
+        self.update_avatar_display()
+        self.populate_table()
+        self.recalculate_totals()
+
     def save_state(self):
-        self.user_data["username"] = self.username
-        self.user_data["hourly_wage"] = self.hourly_wage
-        self.user_data["hours_per_shift"] = self.hours_per_shift
-        self.user_data["emergency_vault"] = self.emergency_vault
-        self.user_data["selected_country"] = self.selected_country
-        self.user_data["work_days"] = self.work_days
-        self.user_data["transactions"] = self.transactions_data
-        self.user_data["history"] = self.history_data
-        self.data_manager.save_data(self.user_data)
+        all_accounts = self.data_manager.load_data()
+        all_accounts[self.username] = {
+            "username": self.username,
+            "password": self.password,
+            "hourly_wage": self.hourly_wage,
+            "hours_per_shift": self.hours_per_shift,
+            "emergency_vault": self.emergency_vault,
+            "selected_country": self.selected_country,
+            "profile_pic": self.profile_pic_path,
+            "work_days": self.work_days,
+            "transactions": self.transactions_data,
+            "history": self.history_data
+        }
+        self.data_manager.save_data(all_accounts)
 
     def init_ui(self):
         self.setObjectName("HomeMainWidget")
@@ -639,11 +683,24 @@ class home(QWidget):
 
         header_bar = QHBoxLayout()
         welcome_card = QFrame()
-        welcome_card.setFixedHeight(65)
+        welcome_card.setFixedHeight(75)
         welcome_card.setStyleSheet("background-color: rgba(30, 41, 59, 0.7); border: 1px solid rgba(51, 65, 85, 0.8); border-radius: 12px;")
 
-        welcome_layout = QVBoxLayout(welcome_card)
+        welcome_layout = QHBoxLayout(welcome_card)
         welcome_layout.setContentsMargins(15, 8, 15, 8)
+        welcome_layout.setSpacing(12)
+
+        self.logo_label = QLabel()
+        self.logo_label.setFixedSize(45, 45)
+        self.logo_label.setStyleSheet("background: transparent; border: none;")
+        
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "BudgetWise_AI_logo.png")
+        if os.path.exists(logo_path):
+            pix = QPixmap(logo_path).scaled(45, 45, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.logo_label.setPixmap(pix)
+
+        text_container = QVBoxLayout()
+        text_container.setSpacing(2)
 
         self.welcome_label = QLabel(f"Welcome back, {self.username}! 👋")
         self.welcome_label.setFont(QFont("Segoe UI", 15, QFont.Bold))
@@ -653,8 +710,29 @@ class home(QWidget):
         self.sub_label.setFont(QFont("Segoe UI", 9))
         self.sub_label.setStyleSheet("color: #94A3B8; background: transparent; border: none;")
 
-        welcome_layout.addWidget(self.welcome_label)
-        welcome_layout.addWidget(self.sub_label)
+        text_container.addWidget(self.welcome_label)
+        text_container.addWidget(self.sub_label)
+
+        self.avatar_btn = QPushButton("👤")
+        self.avatar_btn.setFixedSize(42, 42)
+        self.avatar_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #334155;
+                color: #F8FAFC;
+                border: 2px solid #64748B;
+                border-radius: 21px;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #2563EB;
+                border-color: #60A5FA;
+            }
+        """)
+        self.avatar_btn.clicked.connect(self.show_user_menu)
+
+        welcome_layout.addWidget(self.logo_label)
+        welcome_layout.addLayout(text_container, 1)
+        welcome_layout.addWidget(self.avatar_btn)
         header_bar.addWidget(welcome_card, 1)
 
         cards_layout = QHBoxLayout()
@@ -742,8 +820,78 @@ class home(QWidget):
 
         self.setLayout(root_layout)
         ThemeManager.apply_dark_theme(self)
-        self.populate_table()
-        self.recalculate_totals()
+
+    def update_avatar_display(self):
+        if self.profile_pic_path and os.path.exists(self.profile_pic_path):
+            self.avatar_btn.setText("")
+            pixmap = QPixmap(self.profile_pic_path)
+            self.avatar_btn.setIcon(QIcon(pixmap))
+            self.avatar_btn.setIconSize(QSize(36, 36))
+        else:
+            self.avatar_btn.setIcon(QIcon())
+            self.avatar_btn.setText("👤")
+
+    def show_user_menu(self):
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #1E293B;
+                color: #F8FAFC;
+                border: 1px solid #334155;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
+            QMenu::item:selected {
+                background-color: #2563EB;
+                color: white;
+            }
+        """)
+
+        action_change_pfp = menu.addAction("📷 Change Profile Picture")
+        action_change_pass = menu.addAction("🔑 Change Password")
+        menu.addSeparator()
+        action_logout = menu.addAction("🚪 Logout")
+
+        selected_action = menu.exec_(self.avatar_btn.mapToGlobal(self.avatar_btn.rect().bottomLeft()))
+
+        if selected_action == action_change_pfp:
+            self.change_profile_picture()
+        elif selected_action == action_change_pass:
+            self.change_password()
+        elif selected_action == action_logout:
+            self.logout()
+
+    def change_profile_picture(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Profile Picture", "", "Image Files (*.png *.jpg *.jpeg *.bmp)"
+        )
+        if file_path:
+            self.profile_pic_path = file_path
+            self.update_avatar_display()
+            self.save_state()
+
+    def change_password(self):
+        new_pass, ok = QInputDialog.getText(
+            self, "Change Password", "Enter your new password:", QLineEdit.Password
+        )
+        if ok and new_pass.strip():
+            self.password = new_pass.strip()
+            self.save_state()
+            QMessageBox.information(self, "Success", "Password updated successfully!")
+
+    def logout(self):
+        box = QMessageBox.question(
+            self, "Logout", "Are you sure you want to log out?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if box == QMessageBox.Yes:
+            self.save_state()
+            self.logout_signal.emit()
 
     def create_metric_card(self, title, amount, subtitle, border_color, text_color):
         card = QFrame()
@@ -803,7 +951,6 @@ class home(QWidget):
         self.lbl_savings_sub.setText(f"{savings_pct:.1f}% Remaining")
 
     def run_ai_safespend_check(self, proposed_amount):
-        """Calculates EWMA projection and returns a user-friendly warning message."""
         today = QDate.currentDate()
         t_current = max(min(self.fortnight_start_date.daysTo(today), 14), 1)
         t_target = 14.0
@@ -889,7 +1036,7 @@ class home(QWidget):
             self.save_state()
 
     def open_upgrade_dialog(self):
-        webbrowser.open("https://agent-6a78ae13c56797ee63e8e2a7--budgetwizardai.netlify.app/")
+        webbrowser.open("https://budgetwizardai.netlify.app/")
 
     def open_currency_converter(self):
         dlg = CurrencyConverterDialog(self.selected_country, self)
@@ -916,8 +1063,3 @@ class home(QWidget):
     def get_report_data(self):
         all_transactions = self.history_data + self.transactions_data
         return self.total_budget, all_transactions
-
-    def set_username(self, username):
-        self.username = username
-        self.welcome_label.setText(f"Welcome back, {self.username}! 👋")
-        self.save_state()
