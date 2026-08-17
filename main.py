@@ -81,7 +81,7 @@ class BudgetWiseApp(QWidget):
         footer_layout.setContentsMargins(10, 5, 10, 10)
         footer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        copyright_label = QLabel("© 2026 BudgetWise AI. All Rights Reserved.")
+        copyright_label = QLabel("© 2026 BudgetWise AI. All Rights Reserved to Oak Technologies. This is a high school final year research project.")
         copyright_label.setFont(QFont("Segoe UI", 8))
         copyright_label.setStyleSheet("color: #64748B; font-weight: bold; background: transparent;")
 
