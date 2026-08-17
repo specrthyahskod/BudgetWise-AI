@@ -1053,6 +1053,14 @@ class home(QWidget):
         self.save_state()
 
     def trigger_fortnight_reset(self):
+        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+        total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
+        rem_savings = (self.total_budget + total_income) - total_expenses
+
+        if rem_savings > 0:
+            self.emergency_vault += rem_savings
+
+        self.history_data.extend(self.transactions_data)
         self.transactions_data = []
         self.work_days = []
         self.fortnight_start_date = QDate.currentDate()
