@@ -13,19 +13,11 @@ from PyQt5.QtGui import QFont, QColor, QTextCharFormat, QPixmap, QIcon
 from utils.manager import ThemeManager
 from utils.user_data_manager import UserDataManager
 from models.ai_engine import StudentAIEngine
+from utils.currency_service import load_country_currency_data
 
 ai_engine = StudentAIEngine()
 
-COUNTRY_DATA = {
-    "India 🇮🇳": {"currency": "INR (₹)", "rate": 55.50},
-    "China 🇨🇳": {"currency": "CNY (¥)", "rate": 4.75},
-    "USA 🇺🇸": {"currency": "USD ($)", "rate": 0.66},
-    "Nepal 🇳🇵": {"currency": "NPR (रू)", "rate": 88.80},
-    "Vietnam 🇻🇳": {"currency": "VND (₫)", "rate": 16500.0},
-    "UK 🇬🇧": {"currency": "GBP (£)", "rate": 0.52},
-    "Philippines 🇵🇭": {"currency": "PHP (₱)", "rate": 38.20},
-    "Malaysia 🇲🇾": {"currency": "MYR (RM)", "rate": 3.10}
-}
+COUNTRY_DATA = load_country_currency_data()
 
 def calculate_ewma(samples, alpha=0.35):
     if not samples:
