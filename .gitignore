@@ -17,6 +17,6 @@ __pycache__/
 # OS Files
 .DS_Store
 Thumbs.ds
-.training_inout_data.py
-.users.xlsx
-.expense_classifier.joblib
+
+# json Files
+*.json

@@ -14,6 +14,7 @@ from utils.manager import ThemeManager
 from utils.user_data_manager import UserDataManager
 from models.ai_engine import StudentAIEngine
 from utils.currency_service import load_country_currency_data
+from pages.onboarding import StudentOnboardingWizard
 
 ai_engine = StudentAIEngine()
 
@@ -115,7 +116,7 @@ class WorkCalendarDialog(QDialog):
         for date_str in self.work_days:
             qdate = QDate.fromString(date_str, "yyyy-MM-dd")
             self.calendar.setDateTextFormat(qdate, self.highlight_format)
-        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
+        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} / 14 Days")
 
     def toggle_selected_date(self):
         selected_qdate = self.calendar.selectedDate()
@@ -124,9 +125,15 @@ class WorkCalendarDialog(QDialog):
             self.work_days.remove(date_str)
             self.calendar.setDateTextFormat(selected_qdate, self.normal_format)
         else:
+            if len(self.work_days) >= 14:
+                QMessageBox.information(
+                    self,
+                    "New Fortnight Starting",
+                    "You have completed your 14-day work cycle.\nMarking this 15th shift will finalize the previous fortnight and start a new cycle."
+                )
             self.work_days.add(date_str)
             self.calendar.setDateTextFormat(selected_qdate, self.highlight_format)
-        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} Days")
+        self.status_label.setText(f"Shifts Logged in Fortnight: {len(self.work_days)} / 14 Days")
 
     def get_work_days(self):
         return list(self.work_days)
@@ -512,6 +519,8 @@ class home(QWidget):
         self.fortnight_start_date = QDate.currentDate()
         self.transactions_data = []
         self.history_data = []
+        self.budget_alert_threshold = 80
+        self.ai_strictness = "Standard (EWMA Balanced)"
 
         self.init_ui()
 
@@ -521,6 +530,10 @@ class home(QWidget):
         
         if self.username in all_accounts:
             user_info = all_accounts[self.username]
+            if not user_info.get("onboarding_completed", False):
+                self.launch_onboarding_wizard()
+                return
+
             self.hourly_wage = user_info.get("hourly_wage", 26.44)
             self.hours_per_shift = user_info.get("hours_per_shift", 6.0)
             self.work_days = user_info.get("work_days", [])
@@ -530,16 +543,16 @@ class home(QWidget):
             self.password = user_info.get("password", "")
             self.transactions_data = user_info.get("transactions", [])
             self.history_data = user_info.get("history", [])
+            self.budget_alert_threshold = user_info.get("budget_alert_threshold", 80)
+            self.ai_strictness = user_info.get("ai_safespend_strictness", "Standard (EWMA Balanced)")
+            fn_date_str = user_info.get("fortnight_start_date", "")
+            if fn_date_str:
+                self.fortnight_start_date = QDate.fromString(fn_date_str, "yyyy-MM-dd")
+            else:
+                self.fortnight_start_date = QDate.currentDate()
         else:
-            self.hourly_wage = 26.44
-            self.hours_per_shift = 6.0
-            self.work_days = []
-            self.emergency_vault = 300.00
-            self.selected_country = "India 🇮🇳"
-            self.profile_pic_path = ""
-            self.password = ""
-            self.transactions_data = []
-            self.history_data = []
+            self.launch_onboarding_wizard()
+            return
 
         self.welcome_label.setText(f"Welcome back, {self.username}! 👋")
         
@@ -551,6 +564,68 @@ class home(QWidget):
         self.update_avatar_display()
         self.populate_table()
         self.recalculate_totals()
+        self.check_and_handle_fortnight_cycle()
+
+    def check_and_handle_fortnight_cycle(self, incoming_work_days=None):
+        eval_days = incoming_work_days if incoming_work_days is not None else self.work_days
+        if len(eval_days) >= 15:
+            sorted_dates = sorted(eval_days)
+            first_14_shifts = sorted_dates[:14]
+            carryover_shifts = sorted_dates[14:]
+
+            fortnight_14_budget = 14 * self.hours_per_shift * self.hourly_wage
+            total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+            total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
+            rem_savings = (fortnight_14_budget + total_income) - total_expenses
+            
+            vault_added = max(rem_savings, 0.0)
+            self.emergency_vault += vault_added
+
+            self.history_data.extend(self.transactions_data)
+            self.transactions_data = []
+            self.work_days = list(carryover_shifts)
+            
+            if carryover_shifts:
+                self.fortnight_start_date = QDate.fromString(carryover_shifts[0], "yyyy-MM-dd")
+            else:
+                self.fortnight_start_date = QDate.currentDate()
+
+            self.populate_table()
+            self.recalculate_totals()
+            self.save_state()
+            
+            QMessageBox.information(
+                self,
+                "🔄 Fortnight Cycle Completed",
+                f"14-day work cycle finalized upon logging shift #15!\n\n"
+                f"• Net Savings Transferred to Vault: ${vault_added:,.2f}\n"
+                f"• Current Vault Balance: ${self.emergency_vault:,.2f}\n"
+                f"• Past transactions archived to Financial Reports.\n\n"
+                f"Active cycle reset with remaining active shifts: {len(self.work_days)}"
+            )
+
+    def launch_onboarding_wizard(self):
+        wizard = StudentOnboardingWizard(self.username, self)
+        if wizard.exec_() == QDialog.Accepted:
+            profile = wizard.get_configured_profile()
+            
+            self.hourly_wage = profile["hourly_wage"]
+            self.hours_per_shift = profile["hours_per_shift"]
+            self.emergency_vault = profile["emergency_vault"]
+            self.selected_country = profile["origin_country"]
+            self.budget_alert_threshold = profile.get("budget_alert_threshold", 80)
+            self.ai_strictness = profile.get("ai_safespend_strictness", "Standard (EWMA Balanced)")
+            self.fortnight_start_date = QDate.currentDate()
+            
+            all_accounts = self.data_manager.load_data()
+            curr_user = all_accounts.get(self.username, {})
+            curr_user.update(profile)
+            curr_user["username"] = self.username
+            curr_user["fortnight_start_date"] = self.fortnight_start_date.toString("yyyy-MM-dd")
+            all_accounts[self.username] = curr_user
+            self.data_manager.save_data(all_accounts)
+            
+            self.set_username(self.username)
 
     def save_state(self):
         all_accounts = self.data_manager.load_data()
@@ -564,7 +639,11 @@ class home(QWidget):
             "profile_pic": self.profile_pic_path,
             "work_days": self.work_days,
             "transactions": self.transactions_data,
-            "history": self.history_data
+            "history": self.history_data,
+            "fortnight_start_date": self.fortnight_start_date.toString("yyyy-MM-dd"),
+            "budget_alert_threshold": self.budget_alert_threshold,
+            "ai_safespend_strictness": self.ai_strictness,
+            "onboarding_completed": True
         }
         self.data_manager.save_data(all_accounts)
 
@@ -641,7 +720,7 @@ class home(QWidget):
 
         btn_reset_fn = QPushButton("🔄 Reset Fortnight")
         btn_reset_fn.setFixedHeight(36)
-        btn_reset_fn.clicked.connect(self.trigger_fortnight_reset)
+        btn_reset_fn.clicked.connect(lambda: self.trigger_fortnight_reset(is_auto=False))
 
         country_label = QLabel("Origin Country:")
         country_label.setFont(QFont("Segoe UI", 9))
@@ -732,7 +811,7 @@ class home(QWidget):
 
         self.budget_box, self.lbl_budget_val, self.lbl_budget_sub = self.create_metric_card(
             "Accrued Budget", f"${self.total_budget:.2f}",
-            f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr",
+            f"{len(self.work_days)} / 14 days worked @ ${self.hourly_wage:.2f}/hr",
             "rgba(59, 130, 246, 0.4)", "#60A5FA"
         )
         self.expenses_box, self.lbl_expenses_val, self.lbl_expenses_sub = self.create_metric_card(
@@ -936,13 +1015,47 @@ class home(QWidget):
         savings_pct = (total_savings / effective_budget * 100) if effective_budget > 0 else 0.0
 
         self.lbl_budget_val.setText(f"${effective_budget:,.2f}")
-        self.lbl_budget_sub.setText(f"{len(self.work_days)} days worked @ ${self.hourly_wage:.2f}/hr")
+        self.lbl_budget_sub.setText(f"{len(self.work_days)} / 14 days worked @ ${self.hourly_wage:.2f}/hr")
         self.lbl_expenses_val.setText(f"${total_expenses:,.2f}")
         self.lbl_expenses_sub.setText(f"{expense_pct:.1f}% of Budget")
         self.lbl_savings_val.setText(f"${total_savings:,.2f}")
         self.lbl_savings_sub.setText(f"{savings_pct:.1f}% Remaining")
 
     def run_ai_safespend_check(self, proposed_amount):
+        total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
+        total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
+        effective_budget = self.total_budget + total_income
+        current_savings = max(effective_budget - total_expenses, 0.0)
+
+        alert_pct = float(self.budget_alert_threshold)
+        threshold_ratio = alert_pct / 100.0
+
+        if current_savings > 0:
+            spend_ratio = proposed_amount / current_savings
+            if spend_ratio >= threshold_ratio:
+                pct = spend_ratio * 100.0
+                warning_msg = (
+                    f"⚠️ High-Impact Expense Alert!\n\n"
+                    f"• Proposed Amount: ${proposed_amount:.2f}\n"
+                    f"• Current Available Savings: ${current_savings:.2f}\n"
+                    f"• Depletion Ratio: {pct:.1f}% of remaining balance\n\n"
+                    f"This transaction exceeds your configured threshold of {alert_pct:.0f}% of available fortnight savings."
+                )
+                return False, warning_msg
+
+        new_total_expenses = total_expenses + proposed_amount
+        if effective_budget > 0:
+            overall_spend_pct = (new_total_expenses / effective_budget) * 100.0
+            if overall_spend_pct >= alert_pct:
+                warning_msg = (
+                    f"⚠️ Budget Threshold Exceeded!\n\n"
+                    f"• Proposed Expense: ${proposed_amount:.2f}\n"
+                    f"• Cumulative Spend: ${new_total_expenses:.2f} / ${effective_budget:.2f}\n"
+                    f"• Budget Consumption: {overall_spend_pct:.1f}%\n\n"
+                    f"This expense pushes total spending beyond your {alert_pct:.0f}% budget limit."
+                )
+                return False, warning_msg
+
         today = QDate.currentDate()
         t_current = max(min(self.fortnight_start_date.daysTo(today), 14), 1)
         t_target = 14.0
@@ -954,16 +1067,21 @@ class home(QWidget):
                 day_idx = max(self.fortnight_start_date.daysTo(tx_date), 1)
                 daily_expenses_map[day_idx] = daily_expenses_map.get(day_idx, 0.0) + item[4]
 
-        daily_samples = [daily_expenses_map.get(d, 0.0) for d in range(1, t_current + 1)]
-        v_ewma = calculate_ewma(daily_samples, alpha=0.35)
+        alpha_val = 0.35
+        if "Strict" in self.ai_strictness:
+            alpha_val = 0.50
+        elif "Relaxed" in self.ai_strictness:
+            alpha_val = 0.20
 
-        e_current = sum(item[4] for item in self.transactions_data if item[2] != "Income") + proposed_amount
+        daily_samples = [daily_expenses_map.get(d, 0.0) for d in range(1, t_current + 1)]
+        v_ewma = calculate_ewma(daily_samples, alpha=alpha_val)
+
         time_remaining = t_target - t_current
-        e_projected = e_current + (v_ewma * time_remaining)
+        e_projected = new_total_expenses + (v_ewma * time_remaining)
 
         if e_projected > self.total_budget:
             deficit = e_projected - self.total_budget
-            safe_daily_limit = max((self.total_budget - e_current) / max(time_remaining, 1), 0.0)
+            safe_daily_limit = max((self.total_budget - new_total_expenses) / max(time_remaining, 1), 0.0)
             
             warning_msg = (
                 f"⚠️ Overspending Alert!\n\n"
@@ -1006,9 +1124,13 @@ class home(QWidget):
     def open_work_calendar_dialog(self):
         dlg = WorkCalendarDialog(self.work_days, self)
         if dlg.exec_() == QDialog.Accepted:
-            self.work_days = dlg.get_work_days()
-            self.recalculate_totals()
-            self.save_state()
+            updated_work_days = dlg.get_work_days()
+            if len(updated_work_days) >= 15:
+                self.check_and_handle_fortnight_cycle(incoming_work_days=updated_work_days)
+            else:
+                self.work_days = updated_work_days
+                self.recalculate_totals()
+                self.save_state()
 
     def open_emergency_vault_dialog(self):
         total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
@@ -1044,7 +1166,7 @@ class home(QWidget):
         self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
         self.save_state()
 
-    def trigger_fortnight_reset(self):
+    def trigger_fortnight_reset(self, is_auto=False):
         total_expenses = sum(item[4] for item in self.transactions_data if item[2] != "Income")
         total_income = sum(item[4] for item in self.transactions_data if item[2] == "Income")
         rem_savings = (self.total_budget + total_income) - total_expenses
@@ -1055,6 +1177,7 @@ class home(QWidget):
         self.history_data.extend(self.transactions_data)
         self.transactions_data = []
         self.work_days = []
+        self.total_budget = 0.0
         self.fortnight_start_date = QDate.currentDate()
         self.populate_table()
         self.recalculate_totals()
