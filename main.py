@@ -137,6 +137,7 @@ class BudgetWiseApp(QWidget):
         self.switch_page(1)
 
     def show_report_page(self):
+        self.report_page.set_user_context(self.home_page.username)
         budget, transactions = self.home_page.get_report_data()
         self.report_page.update_report(budget, transactions)
         self.switch_page(4)

@@ -1,15 +1,22 @@
 import os
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
+    QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QFileDialog, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont, QColor, QPixmap
 
+from utils.user_data_manager import UserDataManager
 
 class FinancialReportPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.data_manager = UserDataManager()
+        self.username = "Student"
+        self.current_base_allowance = 0.0
+        self.current_transactions = []
+        self.report_export_path = os.path.join(os.path.expanduser("~"), "Desktop")
         self.init_ui()
 
     def init_ui(self):
@@ -19,7 +26,6 @@ class FinancialReportPage(QWidget):
         main_layout.setContentsMargins(25, 20, 25, 20)
         main_layout.setSpacing(20)
 
-        # Top Bar
         top_bar = QHBoxLayout()
         
         title_box = QHBoxLayout()
@@ -39,6 +45,42 @@ class FinancialReportPage(QWidget):
         title_box.addWidget(logo_label)
         title_box.addWidget(title)
 
+        actions_box = QHBoxLayout()
+        actions_box.setSpacing(10)
+
+        self.btn_set_storage = QPushButton("📁 Storage Path")
+        self.btn_set_storage.setFixedSize(140, 36)
+        self.btn_set_storage.setStyleSheet("""
+            QPushButton {
+                background-color: #334155;
+                color: #F8FAFC;
+                font-weight: bold;
+                border-radius: 8px;
+                border: 1px solid #475569;
+            }
+            QPushButton:hover {
+                background-color: #475569;
+                border-color: #64748B;
+            }
+        """)
+        self.btn_set_storage.clicked.connect(self.choose_storage_location)
+
+        self.btn_download = QPushButton("⬇️ Download Week")
+        self.btn_download.setFixedSize(150, 36)
+        self.btn_download.setStyleSheet("""
+            QPushButton {
+                background-color: #16A34A;
+                color: white;
+                font-weight: bold;
+                border-radius: 8px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #15803D;
+            }
+        """)
+        self.btn_download.clicked.connect(self.download_current_week_report)
+
         self.back_btn = QPushButton("← Back to Dashboard")
         self.back_btn.setFixedSize(160, 36)
         self.back_btn.setStyleSheet("""
@@ -54,11 +96,14 @@ class FinancialReportPage(QWidget):
             }
         """)
 
+        actions_box.addWidget(self.btn_set_storage)
+        actions_box.addWidget(self.btn_download)
+        actions_box.addWidget(self.back_btn)
+
         top_bar.addLayout(title_box)
         top_bar.addStretch()
-        top_bar.addWidget(self.back_btn)
+        top_bar.addLayout(actions_box)
 
-        # Cards Layout
         cards_layout = QHBoxLayout()
         cards_layout.setSpacing(15)
 
@@ -72,7 +117,6 @@ class FinancialReportPage(QWidget):
         cards_layout.addWidget(self.card_spent)
         cards_layout.addWidget(self.card_net)
 
-        # Breakdown Container
         breakdown_frame = QFrame()
         breakdown_frame.setStyleSheet("""
             QFrame {
@@ -150,7 +194,103 @@ class FinancialReportPage(QWidget):
         layout.addWidget(lbl_val)
         return card, lbl_val
 
+    def set_user_context(self, username):
+        self.username = username
+        all_accounts = self.data_manager.load_data()
+        if self.username in all_accounts:
+            user_info = all_accounts[self.username]
+            self.report_export_path = user_info.get(
+                "report_export_path", 
+                os.path.join(os.path.expanduser("~"), "Desktop")
+            )
+
+    def choose_storage_location(self):
+        new_dir = QFileDialog.getExistingDirectory(
+            self, "Select Report Storage Location", self.report_export_path
+        )
+        if new_dir:
+            self.report_export_path = new_dir
+            all_accounts = self.data_manager.load_data()
+            if self.username in all_accounts:
+                all_accounts[self.username]["report_export_path"] = self.report_export_path
+                self.data_manager.save_data(all_accounts)
+            QMessageBox.information(
+                self, 
+                "Storage Updated", 
+                f"Fortnightly automatic reports will now be stored in:\n\n{self.report_export_path}"
+            )
+
+    def download_current_week_report(self):
+        target_dir = QFileDialog.getExistingDirectory(
+            self, "Select Folder to Download Report", self.report_export_path
+        )
+        if not target_dir:
+            return
+
+        today = QDate.currentDate()
+        week_ago = today.addDays(-7)
+
+        week_txs = []
+        for item in self.current_transactions:
+            tx_qdate = QDate.fromString(str(item[0]), "yyyy-MM-dd")
+            if week_ago.daysTo(tx_qdate) >= 0:
+                week_txs.append(item)
+
+        total_income = sum(t[4] for t in week_txs if len(t) > 4 and t[2] == "Income")
+        total_spent = sum(t[4] for t in week_txs if len(t) > 4 and t[2] != "Income")
+        net_savings = (self.current_base_allowance + total_income) - total_spent
+
+        lines = []
+        lines.append("=" * 65)
+        lines.append("          BUDGETWISE AI — FINANCIAL STATEMENT REPORT")
+        lines.append("=" * 65)
+        lines.append(f"User Account       : {self.username}")
+        lines.append(f"Statement Period   : Past 7 Days ({week_ago.toString('yyyy-MM-dd')} to {today.toString('yyyy-MM-dd')})")
+        lines.append(f"Generated On       : {today.toString('yyyy-MM-dd')}")
+        lines.append("-" * 65)
+        lines.append(f"Base Allowance     : ${self.current_base_allowance:>12.2f}")
+        lines.append(f"Weekly Income      : ${total_income:>12.2f}")
+        lines.append(f"Weekly Expenses    : ${total_spent:>12.2f}")
+        lines.append(f"Net Weekly Balance : ${net_savings:>12.2f}")
+        lines.append("=" * 65)
+        lines.append(f"{'DATE':<12} | {'CATEGORY':<14} | {'AMOUNT':<10} | {'DESCRIPTION'}")
+        lines.append("-" * 65)
+
+        if not week_txs:
+            lines.append("No transactions logged in the past 7 days.")
+        else:
+            for item in week_txs:
+                lines.append(f"{str(item[0]):<12} | {str(item[2]):<14} | {str(item[3]):<10} | {str(item[1])}")
+
+        lines.append("=" * 65)
+        lines.append("              BudgetWise AI Finance Companion © 2026")
+        lines.append("=" * 65)
+
+        timestamp_str = today.toString("yyyyMMdd")
+        filename = f"BudgetWise_WeekReport_{self.username}_{timestamp_str}.txt"
+        full_path = os.path.join(target_dir, filename)
+
+        counter = 1
+        while os.path.exists(full_path):
+            filename = f"BudgetWise_WeekReport_{self.username}_{timestamp_str}_{counter}.txt"
+            full_path = os.path.join(target_dir, filename)
+            counter += 1
+
+        try:
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(lines))
+            QMessageBox.information(
+                self, 
+                "Download Successful", 
+                f"Your 7-day statement has been saved to:\n\n{full_path}"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Export Failed", f"Could not write file:\n{e}")
+
     def update_report(self, base_allowance, transactions):
+        self.current_base_allowance = base_allowance
+        self.current_transactions = transactions
+
         total_income = sum(t[4] for t in transactions if len(t) > 4 and t[2] == "Income")
         total_spent = sum(t[4] for t in transactions if len(t) > 4 and t[2] != "Income")
         net_remaining = (base_allowance + total_income) - total_spent

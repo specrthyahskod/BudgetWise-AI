@@ -521,6 +521,7 @@ class home(QWidget):
         self.history_data = []
         self.budget_alert_threshold = 80
         self.ai_strictness = "Standard (EWMA Balanced)"
+        self.report_export_path = os.path.join(os.path.expanduser("~"), "Desktop")
 
         self.init_ui()
 
@@ -545,6 +546,7 @@ class home(QWidget):
             self.history_data = user_info.get("history", [])
             self.budget_alert_threshold = user_info.get("budget_alert_threshold", 80)
             self.ai_strictness = user_info.get("ai_safespend_strictness", "Standard (EWMA Balanced)")
+            self.report_export_path = user_info.get("report_export_path", os.path.join(os.path.expanduser("~"), "Desktop"))
             fn_date_str = user_info.get("fortnight_start_date", "")
             if fn_date_str:
                 self.fortnight_start_date = QDate.fromString(fn_date_str, "yyyy-MM-dd")
@@ -566,6 +568,88 @@ class home(QWidget):
         self.recalculate_totals()
         self.check_and_handle_fortnight_cycle()
 
+    def generate_report_text(self, budget, transactions, cycle_label):
+        total_income = sum(item[4] for item in transactions if item[2] == "Income")
+        total_expenses = sum(item[4] for item in transactions if item[2] != "Income")
+        net_savings = (budget + total_income) - total_expenses
+        
+        lines = []
+        lines.append("=" * 65)
+        lines.append(f"          BUDGETWISE AI — FINANCIAL STATEMENT REPORT")
+        lines.append("=" * 65)
+        lines.append(f"User Account       : {self.username}")
+        lines.append(f"Statement Cycle    : {cycle_label}")
+        lines.append(f"Generated On       : {QDate.currentDate().toString('yyyy-MM-dd')}")
+        lines.append(f"Base Hourly Wage   : ${self.hourly_wage:.2f} / hr")
+        lines.append(f"Shift Duration     : {self.hours_per_shift:.1f} hrs/shift")
+        lines.append("-" * 65)
+        lines.append(f"Accrued Work Budget: ${budget:>12.2f}")
+        lines.append(f"Additional Income  : ${total_income:>12.2f}")
+        lines.append(f"Total Expenditure  : ${total_expenses:>12.2f}")
+        lines.append(f"Net Cycle Savings  : ${net_savings:>12.2f}")
+        lines.append(f"Emergency Vault    : ${self.emergency_vault:>12.2f}")
+        lines.append("=" * 65)
+        lines.append(f"{'DATE':<12} | {'CATEGORY':<14} | {'AMOUNT':<10} | {'DESCRIPTION'}")
+        lines.append("-" * 65)
+        
+        if not transactions:
+            lines.append("No transactions recorded for this period.")
+        else:
+            for item in transactions:
+                d_str = str(item[0])
+                desc = str(item[1])
+                cat = str(item[2])
+                amt_str = str(item[3])
+                lines.append(f"{d_str:<12} | {cat:<14} | {amt_str:<10} | {desc}")
+                
+        lines.append("=" * 65)
+        lines.append("              BudgetWise AI Finance Companion © 2026")
+        lines.append("=" * 65)
+        return "\n".join(lines)
+
+    def export_report_file(self, target_folder, budget, transactions, cycle_label):
+        try:
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder, exist_ok=True)
+            timestamp_str = QDate.currentDate().toString("yyyyMMdd")
+            filename = f"BudgetWise_Report_{self.username}_{timestamp_str}.txt"
+            full_path = os.path.join(target_folder, filename)
+            
+            counter = 1
+            while os.path.exists(full_path):
+                filename = f"BudgetWise_Report_{self.username}_{timestamp_str}_{counter}.txt"
+                full_path = os.path.join(target_folder, filename)
+                counter += 1
+                
+            content = self.generate_report_text(budget, transactions, cycle_label)
+            with open(full_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            return full_path
+        except Exception:
+            return ""
+
+    def download_current_week_report(self):
+        dest_folder = QFileDialog.getExistingDirectory(self, "Select Download Folder", self.report_export_path)
+        if not dest_folder:
+            return
+            
+        today = QDate.currentDate()
+        week_ago = today.addDays(-7)
+        
+        current_week_txs = []
+        for item in self.transactions_data:
+            tx_qdate = QDate.fromString(str(item[0]), "yyyy-MM-dd")
+            if tx_qdate.toPyDate() >= week_ago.toPyDate():
+                current_week_txs.append(item)
+                
+        cycle_lbl = f"Current Week ({week_ago.toString('yyyy-MM-dd')} to {today.toString('yyyy-MM-dd')})"
+        saved_file = self.export_report_file(dest_folder, self.total_budget, current_week_txs, cycle_lbl)
+        
+        if saved_file:
+            QMessageBox.information(self, "Report Downloaded", f"Current week's financial statement exported to:\n\n{saved_file}")
+        else:
+            QMessageBox.warning(self, "Export Failed", "Unable to save report file to selected path.")
+
     def check_and_handle_fortnight_cycle(self, incoming_work_days=None):
         eval_days = incoming_work_days if incoming_work_days is not None else self.work_days
         if len(eval_days) >= 15:
@@ -581,7 +665,10 @@ class home(QWidget):
             vault_added = max(rem_savings, 0.0)
             self.emergency_vault += vault_added
 
-            self.history_data.extend(self.transactions_data)
+            cycle_label = f"Completed Fortnight Cycle ({self.fortnight_start_date.toString('yyyy-MM-dd')} to {QDate.currentDate().toString('yyyy-MM-dd')})"
+            exported_loc = self.export_report_file(self.report_export_path, fortnight_14_budget, self.transactions_data, cycle_label)
+
+            self.history_data = []
             self.transactions_data = []
             self.work_days = list(carryover_shifts)
             
@@ -594,13 +681,14 @@ class home(QWidget):
             self.recalculate_totals()
             self.save_state()
             
+            export_msg = f"\n• Statement Exported: {exported_loc}" if exported_loc else ""
             QMessageBox.information(
                 self,
                 "🔄 Fortnight Cycle Completed",
                 f"14-day work cycle finalized upon logging shift #15!\n\n"
                 f"• Net Savings Transferred to Vault: ${vault_added:,.2f}\n"
                 f"• Current Vault Balance: ${self.emergency_vault:,.2f}\n"
-                f"• Past transactions archived to Financial Reports.\n\n"
+                f"• Financial Report Page reset for new cycle.{export_msg}\n\n"
                 f"Active cycle reset with remaining active shifts: {len(self.work_days)}"
             )
 
@@ -615,6 +703,7 @@ class home(QWidget):
             self.selected_country = profile["origin_country"]
             self.budget_alert_threshold = profile.get("budget_alert_threshold", 80)
             self.ai_strictness = profile.get("ai_safespend_strictness", "Standard (EWMA Balanced)")
+            self.report_export_path = profile.get("report_export_path", os.path.join(os.path.expanduser("~"), "Desktop"))
             self.fortnight_start_date = QDate.currentDate()
             
             all_accounts = self.data_manager.load_data()
@@ -622,6 +711,7 @@ class home(QWidget):
             curr_user.update(profile)
             curr_user["username"] = self.username
             curr_user["fortnight_start_date"] = self.fortnight_start_date.toString("yyyy-MM-dd")
+            curr_user["report_export_path"] = self.report_export_path
             all_accounts[self.username] = curr_user
             self.data_manager.save_data(all_accounts)
             
@@ -643,6 +733,7 @@ class home(QWidget):
             "fortnight_start_date": self.fortnight_start_date.toString("yyyy-MM-dd"),
             "budget_alert_threshold": self.budget_alert_threshold,
             "ai_safespend_strictness": self.ai_strictness,
+            "report_export_path": self.report_export_path,
             "onboarding_completed": True
         }
         self.data_manager.save_data(all_accounts)
@@ -1174,7 +1265,10 @@ class home(QWidget):
         if rem_savings > 0:
             self.emergency_vault += rem_savings
 
-        self.history_data.extend(self.transactions_data)
+        cycle_label = f"Fortnight Reset ({self.fortnight_start_date.toString('yyyy-MM-dd')} to {QDate.currentDate().toString('yyyy-MM-dd')})"
+        self.export_report_file(self.report_export_path, self.total_budget, self.transactions_data, cycle_label)
+
+        self.history_data = []
         self.transactions_data = []
         self.work_days = []
         self.total_budget = 0.0
