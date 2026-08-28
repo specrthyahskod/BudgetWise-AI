@@ -15,10 +15,34 @@ from utils.user_data_manager import UserDataManager
 from models.ai_engine import StudentAIEngine
 from utils.currency_service import load_country_currency_data
 from pages.onboarding import StudentOnboardingWizard
+from widgets.study_dialog import StudyShiftMatrixDialog
+from widgets.student_tax import TaxCalculator
 
 ai_engine = StudentAIEngine()
 
 COUNTRY_DATA = load_country_currency_data()
+
+VISA_WORK_LIMITS = {
+    "Australia": {"weekly": 24.0, "fortnightly": 48.0, "visa_type": "Student Visa (Subclass 500)"},
+    "United States": {"weekly": 20.0, "fortnightly": 40.0, "visa_type": "F-1 Student Visa (On-Campus/CPT)"},
+    "United Kingdom": {"weekly": 20.0, "fortnightly": 40.0, "visa_type": "Student Visa (Tier 4 Route)"},
+    "Canada": {"weekly": 24.0, "fortnightly": 48.0, "visa_type": "Study Permit Work Regulation"},
+    "Germany": {"weekly": 20.0, "fortnightly": 40.0, "visa_type": "Student Residence Permit (140-Day Rule)"}
+}
+
+def resolve_country_limit(country_name):
+    c_str = str(country_name).lower()
+    if "australia" in c_str:
+        return "Australia", VISA_WORK_LIMITS["Australia"]
+    elif "united states" in c_str or "usa" in c_str or "america" in c_str:
+        return "United States", VISA_WORK_LIMITS["United States"]
+    elif "kingdom" in c_str or "uk" in c_str or "britain" in c_str:
+        return "United Kingdom", VISA_WORK_LIMITS["United Kingdom"]
+    elif "canada" in c_str:
+        return "Canada", VISA_WORK_LIMITS["Canada"]
+    elif "germany" in c_str or "deutschland" in c_str:
+        return "Germany", VISA_WORK_LIMITS["Germany"]
+    return country_name, {"weekly": 20.0, "fortnightly": 40.0, "visa_type": f"{country_name} Student Visa"}
 
 def calculate_ewma(samples, alpha=0.35):
     if not samples:
@@ -277,12 +301,19 @@ class CurrencyConverterDialog(QDialog):
             self.result_label.setText("Enter a valid number!")
 
 class VisaWorkTrackerDialog(QDialog):
-    def __init__(self, hourly_wage, hours_worked, parent=None):
+    def __init__(self, hourly_wage, hours_worked, country_name="Australia", parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Australia Visa Work Limits")
-        self.setFixedSize(340, 290)
-        self.hourly_wage = hourly_wage
-        self.hours_worked = hours_worked
+        self.hourly_wage = float(hourly_wage)
+        self.hours_worked = float(hours_worked)
+        self.resolved_name, self.country_limit_info = resolve_country_limit(country_name)
+        
+        self.weekly_limit = self.country_limit_info["weekly"]
+        self.fortnightly_limit = self.country_limit_info["fortnightly"]
+        self.visa_type = self.country_limit_info["visa_type"]
+
+        self.setWindowTitle(f"Student Visa Work Limits — {self.resolved_name}")
+        self.setFixedSize(380, 320)
+        self.setStyleSheet("background-color: #0F172A; color: #F8FAFC;")
         self.init_ui()
 
     def init_ui(self):
@@ -290,21 +321,27 @@ class VisaWorkTrackerDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(10)
 
-        title = QLabel("⏱️ Visa Work Tracker")
+        title = QLabel(f"⏱️ {self.resolved_name} Visa Work Limits")
         title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        subtitle = QLabel(f"Official Limit: {self.weekly_limit:.0f} hrs/week ({self.fortnightly_limit:.0f} hrs/fortnight)\n{self.visa_type}")
+        subtitle.setFont(QFont("Segoe UI", 8))
+        subtitle.setStyleSheet("color: #94A3B8;")
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setWordWrap(True)
+
         self.w1_input = QLineEdit()
         self.w1_input.setPlaceholderText("Week 1 Hours Worked")
-        self.w1_input.setText(str(self.hours_worked / 2.0))
+        self.w1_input.setText(str(round(self.hours_worked / 2.0, 1)))
         self.w1_input.setFixedHeight(34)
 
         self.w2_input = QLineEdit()
         self.w2_input.setPlaceholderText("Week 2 Hours Worked")
-        self.w2_input.setText(str(self.hours_worked / 2.0))
+        self.w2_input.setText(str(round(self.hours_worked / 2.0, 1)))
         self.w2_input.setFixedHeight(34)
 
-        self.status_label = QLabel(f"Limit: 48 hrs / fortnight | Pay: ${self.hourly_wage:.2f}/hr")
+        self.status_label = QLabel(f"Cap: {self.fortnightly_limit:.0f} hrs/fn | Base Rate: ${self.hourly_wage:.2f}/hr")
         self.status_label.setFont(QFont("Segoe UI", 9, QFont.Bold))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -314,6 +351,7 @@ class VisaWorkTrackerDialog(QDialog):
         check_btn.clicked.connect(self.check_compliance)
 
         layout.addWidget(title)
+        layout.addWidget(subtitle)
         layout.addWidget(self.w1_input)
         layout.addWidget(self.w2_input)
         layout.addWidget(check_btn)
@@ -331,12 +369,19 @@ class VisaWorkTrackerDialog(QDialog):
         self.hours_worked = w1 + w2
         earnings = self.hours_worked * self.hourly_wage
 
-        if self.hours_worked > 48:
-            self.status_label.setText(f"❌ Visa Breach! {self.hours_worked} hrs (>48 hrs)\nEarned: ${earnings:,.2f}")
+        weekly_breach = (w1 > self.weekly_limit) or (w2 > self.weekly_limit)
+        fortnightly_breach = (self.hours_worked > self.fortnightly_limit)
+
+        if weekly_breach or fortnightly_breach:
+            self.status_label.setText(
+                f"❌ Warning: Visa work cap breached!\nLogged {self.hours_worked:.1f} hrs (Max {self.fortnightly_limit:.0f} hrs/fn, {self.weekly_limit:.0f} hrs/wk)\nEst. Income: ${earnings:,.2f}"
+            )
             self.status_label.setStyleSheet("color: #DC2626; font-weight: bold;")
         else:
-            rem = 48 - self.hours_worked
-            self.status_label.setText(f"✅ Compliant! Total: {self.hours_worked} hrs ({rem} hrs left)\nEst. Income: ${earnings:,.2f}")
+            rem = self.fortnightly_limit - self.hours_worked
+            self.status_label.setText(
+                f"✅ You're compliant! Total: {self.hours_worked:.1f} hrs ({rem:.1f} hrs left)\nEst. Income: ${earnings:,.2f}"
+            )
             self.status_label.setStyleSheet("color: #16A34A; font-weight: bold;")
             self.accept()
 
@@ -562,6 +607,9 @@ class home(QWidget):
         if idx != -1:
             self.sidebar_country_combo.setCurrentIndex(idx)
         self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
+        
+        resolved_name, limit_info = resolve_country_limit(self.selected_country)
+        self.btn_visa_ref.setText(f"⏱️ {resolved_name} Visa Tracker ({limit_info['weekly']:.0f}h/wk)")
 
         self.update_avatar_display()
         self.populate_table()
@@ -923,7 +971,7 @@ class home(QWidget):
         tools_layout = QHBoxLayout(tools_frame)
         tools_layout.setContentsMargins(15, 5, 15, 5)
 
-        tools_title = QLabel("🇦🇺 Student Tools:")
+        tools_title = QLabel("🌍 Student Tools:")
         tools_title.setFont(QFont("Segoe UI", 10, QFont.Bold))
         tools_title.setStyleSheet("color: #F8FAFC;")
 
@@ -932,13 +980,25 @@ class home(QWidget):
         btn_currency.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
         btn_currency.clicked.connect(self.open_currency_converter)
 
-        btn_visa = QPushButton("⏱️ 48-Hr Work Tracker")
+        resolved_name, limit_info = resolve_country_limit(self.selected_country)
+        btn_visa = QPushButton(f"⏱️ {resolved_name} Visa Tracker ({limit_info['weekly']:.0f}h/wk)")
+        self.btn_visa_ref = btn_visa
         btn_visa.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
         btn_visa.clicked.connect(self.open_visa_tracker)
+
+        btn_matrix = QPushButton("🧠 Study/Work Matrix")
+        btn_matrix.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
+        btn_matrix.clicked.connect(self.open_study_matrix)
+
+        btn_tax = QPushButton("🏛️ Student Tax Calculator")
+        btn_tax.setStyleSheet("background-color: #0F172A; color: #F8FAFC; border: 1px solid #334155; border-radius: 6px; padding: 6px 12px; font-weight: 600;")
+        btn_tax.clicked.connect(self.open_tax_calculator)
 
         tools_layout.addWidget(tools_title)
         tools_layout.addWidget(btn_currency)
         tools_layout.addWidget(btn_visa)
+        tools_layout.addWidget(btn_matrix)
+        tools_layout.addWidget(btn_tax)
         tools_layout.addStretch()
 
         table_container = QFrame()
@@ -1240,6 +1300,20 @@ class home(QWidget):
             self.recalculate_totals()
             self.save_state()
 
+    def open_study_matrix(self):
+        dlg = StudyShiftMatrixDialog(len(self.work_days), self.hours_per_shift, self)
+        dlg.exec_()
+
+    def open_tax_calculator(self):
+        total_hours = len(self.work_days) * self.hours_per_shift
+        dlg = TaxCalculator(
+            hourly_wage=self.hourly_wage,
+            hours_worked_fn=total_hours,
+            country_name=self.selected_country,
+            parent=self
+        )
+        dlg.exec_()
+
     def open_upgrade_dialog(self):
         webbrowser.open("https://budgetwizardai.netlify.app/")
 
@@ -1248,13 +1322,22 @@ class home(QWidget):
         dlg.exec_()
 
     def open_visa_tracker(self):
-        dlg = VisaWorkTrackerDialog(self.hourly_wage, len(self.work_days) * self.hours_per_shift, self)
+        total_hours = len(self.work_days) * self.hours_per_shift
+        dlg = VisaWorkTrackerDialog(
+            hourly_wage=self.hourly_wage,
+            hours_worked=total_hours,
+            country_name=self.selected_country,
+            parent=self
+        )
         if dlg.exec_() == QDialog.Accepted:
             self.save_state()
 
     def on_country_changed(self, text):
         self.selected_country = text
         self.btn_currency_ref.setText(f"🔀 AUD Converter ({self.selected_country})")
+        
+        resolved_name, limit_info = resolve_country_limit(self.selected_country)
+        self.btn_visa_ref.setText(f"⏱️ {resolved_name} Visa Tracker ({limit_info['weekly']:.0f}h/wk)")
         self.save_state()
 
     def trigger_fortnight_reset(self, is_auto=False):
