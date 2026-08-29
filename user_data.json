@@ -1,106 +1,26 @@
-<<<<<<< HEAD
 {
-    "username": "lunarlord74",
-    "hourly_wage": 26.66,
+    "username": "Student",
+    "hourly_wage": 26.44,
     "fortnight_hours": 48.0,
-    "emergency_vault": 1884.0,
+    "emergency_vault": 300.0,
     "selected_country": "India \ud83c\uddee\ud83c\uddf3",
-    "transactions": [
-        [
-            "2026-08-09",
-            "Netflix",
-            "Entertainment",
-            "-$19.99",
-            19.99
-        ],
-        [
-            "2026-08-08",
-            "Books and Utilities",
-            "Education",
-            "-$11.22",
-            11.22
-        ],
-        [
-            "2027-08-07",
-            "takeaway order",
-            "Food",
-            "-$28.85",
-            28.85
-        ],
-        [
-            "2026-08-07",
-            "Rent",
-            "Education",
-            "-$343.00",
-            343.0
-        ]
-    ],
+    "transactions": [],
     "history": [],
-    "work_days": [
-        "2026-08-07",
-        "2026-08-02",
-        "2026-08-10",
-        "2026-08-05",
-        "2026-08-04",
-        "2026-08-03",
-        "2026-08-08",
-        "2026-08-09",
-        "2026-08-01",
-        "2026-08-06"
-    ],
-    "hours_per_shift": 3.5,
     "Riddhiman Datta": {
         "username": "Riddhiman Datta",
         "password": "",
-        "hourly_wage": 24.66,
+        "hourly_wage": 26.44,
         "hours_per_shift": 3.5,
-        "emergency_vault": 4819.06,
+        "emergency_vault": 300.0,
         "selected_country": "India \ud83c\uddee\ud83c\uddf3",
-        "profile_pic": "C:/Users/Riddhiman/Downloads/sonic-shadow-the-hedgehog-pfp-14.jpg",
-        "work_days": [
-            "2026-08-27",
-            "2026-08-25",
-            "2026-08-28",
-            "2026-08-26",
-            "2026-08-24"
-        ],
+        "profile_pic": "",
+        "work_days": [],
         "transactions": [],
         "history": [],
-        "fortnight_start_date": "2026-08-27",
-        "budget_alert_threshold": 80,
-        "ai_safespend_strictness": "Standard (EWMA Balanced)",
+        "fortnight_start_date": "2026-08-28",
+        "budget_alert_threshold": 50,
+        "ai_safespend_strictness": "Standard (EWMA Alpha 0.35 - Balanced)",
         "report_export_path": "C:\\Users\\Riddhiman\\Desktop",
         "onboarding_completed": true
-    },
-    "lunarlord74": {
-        "username": "lunarlord74",
-        "password": "riddhiman@2009",
-        "hourly_wage": 26.44,
-        "hours_per_shift": 6.0,
-        "emergency_vault": 300.0,
-        "selected_country": "India \ud83c\uddee\ud83c\uddf3",
-        "profile_pic": "C:/Users/Riddhiman/Downloads/800px-Logo_of_the_Parachute_Regiment.png",
-        "work_days": [
-            "2026-08-17"
-        ],
-        "transactions": [],
-        "history": []
-    },
-    "Eric Martin": {
-        "username": "Eric Martin",
-        "password": "",
-        "hourly_wage": 26.44,
-        "hours_per_shift": 3.5,
-        "emergency_vault": 300.0,
-        "selected_country": "India \ud83c\uddee\ud83c\uddf3",
-        "profile_pic": "C:/Users/Riddhiman/Desktop/Pictures/Saved Pictures/WhatsApp Image 2024-07-04 at 6.47.07 AM.jpeg",
-        "work_days": [
-            "2026-08-17"
-        ],
-        "transactions": [],
-        "history": []
     }
 }
-=======
-{}
->>>>>>> c103900eec0df5f0c3a8f7d6081559bdd5c8ff51

@@ -102,7 +102,7 @@ class StudyShiftMatrixDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(12)
 
-        title = QLabel("🤖 Timetable & Workload Routine Matrix")
+        title = QLabel("🤖 Timetable & Workload Routine Management")
         title.setFont(QFont("Segoe UI", 14, QFont.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
