@@ -1,7 +1,7 @@
 import flet as ft
 import requests
 
-RENDER_API_BASE = "https://budgetwise-ai.onrender.com"
+RENDER_API_BASE = "https://budgetwise-ai-mobile.onrender.com/"
 
 def main(page: ft.Page):
     page.title = "BudgetWise Mobile"
