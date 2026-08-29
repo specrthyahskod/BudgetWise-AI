@@ -19,9 +19,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter (Pinned for Flet 0.86.5)
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.8'
           channel: 'stable'
 
       - name: Set up Python
@@ -37,7 +38,7 @@ jobs:
 
       - name: Build Standalone APK
         run: |
-          flet build apk ./mobile --project "BudgetWise-AI"
+          yes | flet build apk ./mobile --project "BudgetWise-AI" --yes || flet build apk ./mobile --project "BudgetWise-AI"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
