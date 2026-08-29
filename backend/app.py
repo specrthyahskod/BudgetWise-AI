@@ -193,7 +193,7 @@ def compute_tax(payload: TaxRequest):
         "is_visa_compliant": payload.hours_worked <= visa_cap
     }
 
-# ----------------- INTERACTIVE WEB UI -----------------
+# ----------------- WEB API ENDPOINT DISPLAY -----------------
 @app.get("/", response_class=HTMLResponse)
 def serve_dashboard():
     return """
@@ -202,125 +202,281 @@ def serve_dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>BudgetWise-AI Model Hub</title>
+        <title>BudgetWise AI — Smart Finance Hub</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+        <style>
+            body { font-family: 'Plus Jakarta Sans', sans-serif; }
+            .glow-card {
+                background: rgba(15, 23, 42, 0.75);
+                backdrop-filter: blur(16px);
+                border: 1px solid rgba(51, 65, 85, 0.6);
+                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .glow-card:hover {
+                border-color: rgba(59, 130, 246, 0.5);
+                box-shadow: 0 12px 30px -10px rgba(37, 99, 235, 0.2);
+                transform: translateY(-2px);
+            }
+            .input-box {
+                background: rgba(2, 6, 23, 0.8);
+                border: 1px solid rgba(51, 65, 85, 0.8);
+                transition: all 0.2s ease;
+            }
+            .input-box:focus {
+                outline: none;
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            }
+            .btn-fx {
+                transition: all 0.2s ease;
+            }
+            .btn-fx:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 6px 20px -4px rgba(59, 130, 246, 0.4);
+            }
+            .btn-fx:active {
+                transform: translateY(1px);
+            }
+        </style>
     </head>
-    <body class="bg-slate-950 text-slate-100 min-h-screen p-6 font-sans">
-        <div class="max-w-5xl mx-auto space-y-6">
-            <header class="border-b border-slate-800 pb-4 text-center">
-                <h1 class="text-3xl font-extrabold text-blue-500">🧠 BudgetWise-AI Algorithmic Engine</h1>
-                <p class="text-slate-400 text-sm mt-1">Live Deployment of Scratch ML Classifier, OLS Velocity & Statutory Math</p>
-                <div class="mt-3 flex justify-center gap-3">
-                    <span class="px-3 py-1 bg-emerald-950 border border-emerald-600 text-emerald-400 text-xs font-semibold rounded-full">Scikit-Learn Naive Bayes: Active</span>
-                    <span class="px-3 py-1 bg-sky-950 border border-sky-600 text-sky-400 text-xs font-semibold rounded-full">NumPy OLS Engine: Active</span>
-                    <a href="/docs" target="_blank" class="px-3 py-1 bg-blue-900 border border-blue-600 text-blue-300 text-xs font-semibold rounded-full hover:bg-blue-800">Open API Docs</a>
+    <body class="bg-slate-950 text-slate-100 min-h-screen p-4 sm:p-8 selection:bg-blue-500 selection:text-white">
+        
+        <!-- Background Ambient Glows -->
+        <div class="fixed top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+        <div class="fixed bottom-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
+
+        <div class="max-w-5xl mx-auto space-y-8">
+            
+            <!-- Header Section -->
+            <header class="text-center space-y-3 pt-2">
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    BudgetWise AI Online Platform
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                    Smart Financial Control & Forecasting
+                </h1>
+                <p class="text-slate-400 text-sm max-w-xl mx-auto font-normal">
+                    Real-time AI spending classifications, purchase safety checks, and pace prediction designed specifically for students.
+                </p>
+                <div class="pt-1">
+                    <a href="/docs" target="_blank" class="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-400 transition-colors font-medium">
+                        Developer Swagger API &rarr;
+                    </a>
                 </div>
             </header>
 
+            <!-- Cards Grid -->
             <div class="grid md:grid-cols-2 gap-6">
-                <!-- NLP Classifier Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
-                    <h2 class="text-lg font-bold text-sky-400">🏷️ Scratch TF-IDF Classifier</h2>
-                    <p class="text-xs text-slate-400">Classifies unstructured bank strings via Multinomial Naive Bayes pipeline.</p>
-                    <div>
-                        <label class="text-xs text-slate-300">Transaction String</label>
-                        <input id="nlp_desc" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="Coles Supermarket Sydney">
+
+                <!-- 1. Expense Categorizer -->
+                <div class="glow-card rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2.5">
+                                <span class="p-2 rounded-xl bg-blue-500/10 text-blue-400 text-lg">🏷️</span>
+                                <div>
+                                    <h2 class="text-base font-bold text-white">Smart Expense Categorizer</h2>
+                                    <p class="text-xs text-slate-400">Instantly detects spending type from store names</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1.5">Store / Transaction Note</label>
+                            <input id="nlp_desc" class="input-box w-full rounded-xl px-3.5 py-2.5 text-sm text-white" value="Zomato">
+                        </div>
+
+                        <button onclick="runClassifier()" class="btn-fx w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">
+                            Identify Category
+                        </button>
                     </div>
-                    <button onclick="runClassifier()" class="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm font-semibold">Predict Category</button>
-                    <pre id="nlp_res" class="bg-slate-950 p-3 rounded text-xs text-emerald-400 border border-slate-800">Awaiting input...</pre>
+
+                    <div id="nlp_res_box" class="mt-4 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 min-h-[58px] flex items-center justify-center text-center">
+                        <span class="text-xs text-slate-500 font-medium">Click above to test category matching</span>
+                    </div>
                 </div>
 
-                <!-- Spending Risk Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
-                    <h2 class="text-lg font-bold text-sky-400">⚠️ Dynamic Purchase Impact Model</h2>
-                    <p class="text-xs text-slate-400">Calculates solvency impact ratio and returns a categorized risk percentage.</p>
-                    <div class="grid grid-cols-2 gap-2">
-                        <div>
-                            <label class="text-xs text-slate-300">Proposed Spend ($)</label>
-                            <input id="risk_amount" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="85.00">
+                <!-- 2. Purchase Safety Check -->
+                <div class="glow-card rounded-2xl p-6 flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-2.5">
+                            <span class="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 text-lg">🛡️</span>
+                            <div>
+                                <h2 class="text-base font-bold text-white">Purchase Safety Check</h2>
+                                <p class="text-xs text-slate-400">Evaluates if an expense is safe for your remaining balance</p>
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-xs text-slate-300">Accrued Budget ($)</label>
-                            <input id="risk_budget" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="1000.00">
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Item Cost ($)</label>
+                                <input id="risk_amount" class="input-box w-full rounded-xl px-3 py-2 text-sm text-white" value="85.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Fortnight Budget ($)</label>
+                                <input id="risk_budget" class="input-box w-full rounded-xl px-3 py-2 text-sm text-white" value="1000.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Spent So Far ($)</label>
+                                <input id="risk_spent" class="input-box w-full rounded-xl px-3 py-2 text-sm text-white" value="820.00">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-300 mb-1">Days Remaining</label>
+                                <input id="risk_days" class="input-box w-full rounded-xl px-3 py-2 text-sm text-white" value="6">
+                            </div>
                         </div>
-                        <div>
-                            <label class="text-xs text-slate-300">Current Spend ($)</label>
-                            <input id="risk_spent" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="820.00">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-300">Days Left</label>
-                            <input id="risk_days" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="6">
-                        </div>
+
+                        <button onclick="runRiskCheck()" class="btn-fx w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">
+                            Check Affordability
+                        </button>
                     </div>
-                    <button onclick="runRiskCheck()" class="w-full bg-indigo-600 hover:bg-indigo-500 py-2 rounded text-sm font-semibold">Evaluate Purchase Risk</button>
-                    <pre id="risk_res" class="bg-slate-950 p-3 rounded text-xs text-emerald-400 border border-slate-800">Awaiting input...</pre>
+
+                    <div id="risk_res_box" class="mt-4 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800/80 min-h-[58px] flex items-center justify-center text-center">
+                        <span class="text-xs text-slate-500 font-medium">Ready to evaluate your purchase</span>
+                    </div>
                 </div>
 
-                <!-- OLS Velocity Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4 md:col-span-2">
-                    <h2 class="text-lg font-bold text-sky-400">📐 Ordinary Least Squares (OLS) Linear Burn Rate Model</h2>
-                    <p class="text-xs text-slate-400">Executes <code>np.linalg.lstsq</code> on cumulative spending vectors to detect slope changes.</p>
-                    <div class="grid md:grid-cols-3 gap-2">
+                <!-- 3. Fortnight Budget Forecaster -->
+                <div class="glow-card rounded-2xl p-6 md:col-span-2 space-y-5">
+                    <div class="flex items-center gap-2.5">
+                        <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 text-lg">📈</span>
                         <div>
-                            <label class="text-xs text-slate-300">Current Day</label>
-                            <input id="ols_day" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="7">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-300">Current Spend ($)</label>
-                            <input id="ols_spent" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="450.00">
-                        </div>
-                        <div>
-                            <label class="text-xs text-slate-300">Fortnight Budget ($)</label>
-                            <input id="ols_budget" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" value="950.00">
+                            <h2 class="text-base font-bold text-white">14-Day Spending & Budget Forecaster</h2>
+                            <p class="text-xs text-slate-400">Projects your end-of-cycle savings based on your daily spending speed</p>
                         </div>
                     </div>
-                    <button onclick="runOLS()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-2 rounded text-sm font-semibold">Run Linear Least Squares Forecast</button>
-                    <pre id="ols_res" class="bg-slate-950 p-3 rounded text-xs text-emerald-400 border border-slate-800 overflow-x-auto">Awaiting input...</pre>
+
+                    <div class="grid sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Current Day in Cycle</label>
+                            <input id="ols_day" class="input-box w-full rounded-xl px-3.5 py-2.5 text-sm text-white" value="7">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Current Total Spent ($)</label>
+                            <input id="ols_spent" class="input-box w-full rounded-xl px-3.5 py-2.5 text-sm text-white" value="450.00">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-300 mb-1">Fortnight Budget Target ($)</label>
+                            <input id="ols_budget" class="input-box w-full rounded-xl px-3.5 py-2.5 text-sm text-white" value="950.00">
+                        </div>
+                    </div>
+
+                    <button onclick="runOLS()" class="btn-fx w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-sm shadow-md">
+                        Calculate Budget Projection
+                    </button>
+
+                    <div id="ols_res_box" class="p-4 rounded-xl bg-slate-950/80 border border-slate-800/80 min-h-[70px] flex items-center justify-center text-center">
+                        <span class="text-xs text-slate-500 font-medium">Click above to generate your fortnight forecast</span>
+                    </div>
                 </div>
+
             </div>
+            
+            <footer class="text-center text-xs text-slate-600 pb-4">
+                BudgetWise AI • Engineered for International & Undergraduate Student Mobility
+            </footer>
         </div>
 
         <script>
             async function runClassifier() {
                 const desc = document.getElementById('nlp_desc').value;
-                const res = await fetch('/api/model/classify', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ description: desc })
-                });
-                const data = await res.json();
-                document.getElementById('nlp_res').innerText = JSON.stringify(data, null, 2);
+                const box = document.getElementById('nlp_res_box');
+                box.innerHTML = `<span class="text-xs text-blue-400 animate-pulse font-medium">Classifying...</span>`;
+
+                try {
+                    const res = await fetch('/api/model/classify', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ description: desc })
+                    });
+                    const data = await res.json();
+                    box.innerHTML = `
+                        <div class="flex items-center justify-between w-full px-2">
+                            <span class="text-xs text-slate-400">Identified Category:</span>
+                            <span class="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold">${data.predicted_category}</span>
+                        </div>
+                    `;
+                } catch (e) {
+                    box.innerHTML = `<span class="text-xs text-rose-400 font-medium">Connection failed</span>`;
+                }
             }
 
             async function runRiskCheck() {
-                const res = await fetch('/api/model/spending-risk', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        proposed_amount: Number(document.getElementById('risk_amount').value),
-                        total_budget: Number(document.getElementById('risk_budget').value),
-                        current_expenses: Number(document.getElementById('risk_spent').value),
-                        days_remaining: Number(document.getElementById('risk_days').value)
-                    })
-                });
-                const data = await res.json();
-                document.getElementById('risk_res').innerText = JSON.stringify(data, null, 2);
+                const box = document.getElementById('risk_res_box');
+                box.innerHTML = `<span class="text-xs text-indigo-400 animate-pulse font-medium">Analyzing...</span>`;
+
+                try {
+                    const res = await fetch('/api/model/spending-risk', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            proposed_amount: Number(document.getElementById('risk_amount').value),
+                            total_budget: Number(document.getElementById('risk_budget').value),
+                            current_expenses: Number(document.getElementById('risk_spent').value),
+                            days_remaining: Number(document.getElementById('risk_days').value)
+                        })
+                    });
+                    const data = await res.json();
+                    const isHigh = data.risk_score > 60;
+                    const badgeClass = isHigh ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+
+                    box.innerHTML = `
+                        <div class="w-full text-left space-y-1.5 px-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold ${isHigh ? 'text-rose-400' : 'text-emerald-400'}">${data.assessment}</span>
+                                <span class="px-2 py-0.5 rounded text-[11px] font-bold border ${badgeClass}">${Math.round(data.risk_score)}% Risk</span>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    box.innerHTML = `<span class="text-xs text-rose-400 font-medium">Evaluation failed</span>`;
+                }
             }
 
             async function runOLS() {
-                const res = await fetch('/api/model/ols-velocity', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        current_day: Number(document.getElementById('ols_day').value),
-                        current_expenses: Number(document.getElementById('ols_spent').value),
-                        accrued_budget: Number(document.getElementById('ols_budget').value),
-                        proposed_amount: 0.0,
-                        daily_expenses: {1: 50.0, 2: 70.0, 3: 45.0, 4: 80.0, 5: 60.0, 6: 90.0, 7: 55.0}
-                    })
-                });
-                const data = await res.json();
-                document.getElementById('ols_res').innerText = JSON.stringify(data, null, 2);
+                const box = document.getElementById('ols_res_box');
+                box.innerHTML = `<span class="text-xs text-emerald-400 animate-pulse font-medium">Computing...</span>`;
+
+                try {
+                    const res = await fetch('/api/model/ols-velocity', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            current_day: Number(document.getElementById('ols_day').value),
+                            current_expenses: Number(document.getElementById('ols_spent').value),
+                            accrued_budget: Number(document.getElementById('ols_budget').value),
+                            proposed_amount: 0.0,
+                            daily_expenses: {1: 50.0, 2: 70.0, 3: 45.0, 4: 80.0, 5: 60.0, 6: 90.0, 7: 55.0}
+                        })
+                    });
+                    const data = await res.json();
+                    const f = data.forecast;
+
+                    box.innerHTML = `
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full text-center">
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="block text-[11px] text-slate-400">Daily Pace</span>
+                                <span class="text-sm font-bold text-sky-400">$${f.burn_rate_per_day}/day</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="block text-[11px] text-slate-400">Projected Total</span>
+                                <span class="text-sm font-bold text-white">$${f.projected_total_expense}</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="block text-[11px] text-slate-400">Safe Daily Limit</span>
+                                <span class="text-sm font-bold text-emerald-400">$${f.safe_daily_limit}/day</span>
+                            </div>
+                            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                                <span class="block text-[11px] text-slate-400">Status</span>
+                                <span class="text-sm font-bold ${f.is_solvent ? 'text-emerald-400' : 'text-rose-400'}">${f.is_solvent ? 'On Track ✅' : 'Over Budget ⚠️'}</span>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    box.innerHTML = `<span class="text-xs text-rose-400 font-medium">Forecast failed</span>`;
+                }
             }
         </script>
     </body>
