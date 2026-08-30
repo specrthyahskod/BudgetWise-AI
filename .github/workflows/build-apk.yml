@@ -38,7 +38,8 @@ jobs:
 
       - name: Build Standalone APK
         run: |
-          yes | flet build apk ./mobile --project "BudgetWise-AI" --yes || flet build apk ./mobile --project "BudgetWise-AI"
+          rm -rf mobile/dist-mobile mobile/build
+          yes | flet build apk ./mobile --module-name main --project "BudgetWise-AI" --debug || flet build apk ./mobile --module-name main --project "BudgetWise-AI" --debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
