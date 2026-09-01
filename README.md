@@ -1,8 +1,8 @@
 <div align="center">
 
-  <img src="assets/BudgetWise_AI_logo.png." alt="BudgetWise AI Logo" width="120" height="120" />
+  <img src="assets/BudgetWise_AI_logo.png" alt="BudgetWise AI Logo" width="120" height="120" />
 
-  # BudgetWise AI
+# BudgetWise AI
   
   **Cross Platform Financial Assistant Monitior for International students studying abroad**
 
@@ -55,10 +55,12 @@ Available on desktop via (PyQt5) and native mobile deployment via (Flet / Flutte
 ## 🛠️ Installation & Local Setup
 
 ### Prerequisites
+
 * Python 3.11 or higher
 * Git
 
 ### Step 1: Clone Repository & Initialize Environment
+
 ```bash
 git clone [https://github.com/your-username/BudgetWise-AI.git](https://github.com/your-username/BudgetWise-AI.git)
 cd BudgetWise-AI
