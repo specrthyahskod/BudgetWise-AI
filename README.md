@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/BudgetWise_AI_logo.png.png" alt="BudgetWise AI Logo" width="120" height="120" />
+  <img src="assets/BudgetWise_AI_logo.png." alt="BudgetWise AI Logo" width="120" height="120" />
 
   # BudgetWise AI
   
