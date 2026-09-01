@@ -45,7 +45,7 @@ Available on desktop via (PyQt5) and native mobile deployment via (Flet / Flutte
 * **Core Language:** Python 3.11+
 * **User Interfaces:** PyQt5 (Desktop), Flet / Flutter (Mobile & PWA)
 * **Backend Framework:** FastAPI, Uvicorn, Pydantic
-* **Machine Learning & Analytics:** Scikit-Learn, NumPy, Pandas, Joblib
+* **Machine Learning & Analytics:** Scikit-Learn, NumPy, Pandas, Joblib and REST API
 * **Data Visualization:** Matplotlib
 * **External APIs:** Gemini API, REST Countries v3.1, Open ER Foreign Exchange
 * **Packaging & CI/CD:** PyInstaller, GitHub Actions, Android SDK / Serious Python
