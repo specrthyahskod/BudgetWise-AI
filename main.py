@@ -3,8 +3,6 @@ import sys
 import re
 import numpy as np
 from datetime import datetime, timedelta
-import pages.reports
-print("REPORTS PATH:", pages.reports.__file__)
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
