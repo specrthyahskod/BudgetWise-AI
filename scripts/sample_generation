@@ -1,0 +1,32 @@
+from models.rcd_format import RCDFileManager
+
+sample_transactions = [
+    {"date": "2026-09-14", "category": "Groceries", "description": "Woolworths Broadway", "amount": 74.50},
+    {"date": "2026-09-15", "category": "Transport", "description": "Opal Top-up", "amount": 25.00},
+    {"date": "2026-09-17", "category": "Dining", "description": "Campus Cafe Lunch", "amount": 16.80},
+    {"date": "2026-09-18", "category": "Utilities", "description": "Mobile Plan Bill", "amount": 62.30}
+]
+
+sample_summary = {
+    "total_spent": 178.60,
+    "record_count": 4,
+    "daily_burn_average": 29.77,
+    "currency": "AUD"
+}
+
+packed_bytes = RCDFileManager.pack_weekly_data(
+    username="specrthyahskod",
+    week_start="2026-09-14",
+    week_end="2026-09-20",
+    transactions=sample_transactions,
+    summary_metrics=sample_summary
+)
+
+saved_path = RCDFileManager.save_file("sample_week.rcd", packed_bytes)
+print(f"Created sample .rcd at: {saved_path}")
+
+parsed = RCDFileManager.unpack_file(saved_path)
+print("Verified Header & Checksum!")
+print(f"User: {parsed['user']}")
+print(f"Records loaded: {len(parsed['records'])}")
+print(f"Summary: {parsed['summary']}")

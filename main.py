@@ -3,6 +3,8 @@ import sys
 import re
 import numpy as np
 from datetime import datetime, timedelta
+import pages.reports
+print("REPORTS PATH:", pages.reports.__file__)
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
@@ -129,7 +131,6 @@ class AffordabilityChatPanel(QWidget):
             ("iPad $500", "Can I buy an iPad for $500?"),
             ("Groceries $120", "Groceries for $120"),
             ("MacBook $2400", "MacBook Pro for $2400 AUD"),
-            ()
         ]
         for label, text in chips:
             chip_btn = QPushButton(label)
@@ -162,7 +163,11 @@ class AffordabilityChatPanel(QWidget):
     def display_welcome_banner(self):
         self.chat_history.setHtml("""
         <div style='background-color: #131B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 12px; margin-bottom: 8px;'>
-            <div style='color: #38BDF8; font-weight: bold; font-size: 12px; margin-bottom: 4px;'>🤖 Hello, Welcome to BudgetWise's Affordability analyzer. </div>
+            <div style='color: #38BDF8; font-weight: bold; font-size: 12px; margin-bottom: 4px;'>🤖 System Ready</div>
+            <div style='color: #94A3B8; font-size: 11px; line-height: 1.4;'>
+                I verify your transactions across a <b>6-month historical window</b> to evaluate liquidity safety:
+                <br>&bull; <b>&lt; $2,000 AUD:</b> Evaluated on current week velocity &amp; daily SafeSpend.
+                <br>&bull; <b>&ge; $2,000 AUD:</b> Evaluated against multi-week capital baseline reserves.
             </div>
         </div>
         """)
@@ -270,6 +275,8 @@ class AffordabilityChatPanel(QWidget):
                                 dt = datetime.strptime(dt[:10], "%Y-%m-%d")
                             except Exception:
                                 dt = now
+                    elif not isinstance(dt, datetime):
+                        dt = now
                     records.append({"amount": amt, "date": dt})
         elif raw_txs is not None and hasattr(raw_txs, "to_dict"):
             try:
@@ -282,7 +289,12 @@ class AffordabilityChatPanel(QWidget):
                             try:
                                 dt = datetime.fromisoformat(dt)
                             except Exception:
-                                dt = now
+                                try:
+                                    dt = datetime.strptime(dt[:10], "%Y-%m-%d")
+                                except Exception:
+                                    dt = now
+                        elif not isinstance(dt, datetime):
+                            dt = now
                         records.append({"amount": amt, "date": dt})
             except Exception:
                 pass
@@ -378,6 +390,7 @@ class AffordabilityChatPanel(QWidget):
 class BudgetWiseApp(QWidget):
     def __init__(self):
         super().__init__()
+        self.afford_btn = None
         self.init_ui()
 
     def init_ui(self):
@@ -473,7 +486,14 @@ class BudgetWiseApp(QWidget):
 
         sig = getattr(self.home_page, "open_affordability_signal", None)
         if sig is not None and hasattr(sig, "connect"):
+            try:
+                sig.disconnect()
+            except Exception:
+                pass
             sig.connect(self.toggle_affordability_chat)
+
+        if self.afford_btn is not None:
+            return
 
         all_buttons = self.home_page.findChildren(QPushButton)
         for btn in all_buttons:
@@ -539,17 +559,20 @@ class BudgetWiseApp(QWidget):
 
     def on_login_success(self, username):
         self.home_page.set_username(username)
+        self.setup_affordability_sidebar_button()
         self.switch_page(1)
 
     def show_report_page(self):
         self.report_page.set_user_context(self.home_page.username)
         budget, transactions = self.home_page.get_report_data()
-        self.report_page.update_report(budget, transactions)
+        self.report_page.update_report(budget, transactions) 
         self.switch_page(4)
 
     def handle_logout(self):
         if hasattr(self.login_widget, "reset_fields"):
             self.login_widget.reset_fields()
+        if hasattr(self, "affordability_sidebar"):
+            self.affordability_sidebar.hide()
         self.switch_page(0)
 
 

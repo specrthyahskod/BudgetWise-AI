@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
     QPushButton, QTableWidget, QTableWidgetItem, QHeaderView,
@@ -8,6 +9,8 @@ from PyQt5.QtCore import Qt, QDate
 from PyQt5.QtGui import QFont, QColor, QPixmap
 
 from utils.user_data_manager import UserDataManager
+from models.rcd_format import RCDFileManager
+
 
 class FinancialReportPage(QWidget):
     def __init__(self, parent=None):
@@ -65,8 +68,8 @@ class FinancialReportPage(QWidget):
         """)
         self.btn_set_storage.clicked.connect(self.choose_storage_location)
 
-        self.btn_download = QPushButton("⬇️ Download Week")
-        self.btn_download.setFixedSize(150, 36)
+        self.btn_download = QPushButton("⬇️ Download Week (.rcd)")
+        self.btn_download.setFixedSize(175, 36)
         self.btn_download.setStyleSheet("""
             QPushButton {
                 background-color: #16A34A;
@@ -221,71 +224,67 @@ class FinancialReportPage(QWidget):
             )
 
     def download_current_week_report(self):
-        target_dir = QFileDialog.getExistingDirectory(
-            self, "Select Folder to Download Report", self.report_export_path
-        )
-        if not target_dir:
-            return
-
         today = QDate.currentDate()
         week_ago = today.addDays(-7)
 
-        week_txs = []
+        week_records = []
         for item in self.current_transactions:
+            if not isinstance(item, (list, tuple)) or len(item) < 4:
+                continue
             tx_qdate = QDate.fromString(str(item[0]), "yyyy-MM-dd")
             if week_ago.daysTo(tx_qdate) >= 0:
-                week_txs.append(item)
+                amount = float(item[4]) if len(item) > 4 else float(str(item[3]).replace("$", "").replace(",", ""))
+                week_records.append({
+                    "date": str(item[0]),
+                    "category": str(item[2]),
+                    "description": str(item[1]),
+                    "amount": amount
+                })
 
-        total_income = sum(t[4] for t in week_txs if len(t) > 4 and t[2] == "Income")
-        total_spent = sum(t[4] for t in week_txs if len(t) > 4 and t[2] != "Income")
+        total_income = sum(t["amount"] for t in week_records if t["category"] == "Income")
+        total_spent = sum(t["amount"] for t in week_records if t["category"] != "Income")
         net_savings = (self.current_base_allowance + total_income) - total_spent
 
-        lines = []
-        lines.append("=" * 65)
-        lines.append("          BUDGETWISE AI — FINANCIAL STATEMENT REPORT")
-        lines.append("=" * 65)
-        lines.append(f"User Account       : {self.username}")
-        lines.append(f"Statement Period   : Past 7 Days ({week_ago.toString('yyyy-MM-dd')} to {today.toString('yyyy-MM-dd')})")
-        lines.append(f"Generated On       : {today.toString('yyyy-MM-dd')}")
-        lines.append("-" * 65)
-        lines.append(f"Base Allowance     : ${self.current_base_allowance:>12.2f}")
-        lines.append(f"Weekly Income      : ${total_income:>12.2f}")
-        lines.append(f"Weekly Expenses    : ${total_spent:>12.2f}")
-        lines.append(f"Net Weekly Balance : ${net_savings:>12.2f}")
-        lines.append("=" * 65)
-        lines.append(f"{'DATE':<12} | {'CATEGORY':<14} | {'AMOUNT':<10} | {'DESCRIPTION'}")
-        lines.append("-" * 65)
+        summary_metrics = {
+            "base_allowance": round(self.current_base_allowance, 2),
+            "weekly_income": round(total_income, 2),
+            "weekly_expenses": round(total_spent, 2),
+            "net_balance": round(net_savings, 2),
+            "record_count": len(week_records),
+            "currency": "AUD"
+        }
 
-        if not week_txs:
-            lines.append("No transactions logged in the past 7 days.")
-        else:
-            for item in week_txs:
-                lines.append(f"{str(item[0]):<12} | {str(item[2]):<14} | {str(item[3]):<10} | {str(item[1])}")
+        # 1. Pack data using custom .rcd format
+        rcd_bytes = RCDFileManager.pack_weekly_data(
+            username=self.username,
+            week_start=week_ago.toString("yyyy-MM-dd"),
+            week_end=today.toString("yyyy-MM-dd"),
+            transactions=week_records,
+            summary_metrics=summary_metrics
+        )
 
-        lines.append("=" * 65)
-        lines.append("              BudgetWise AI Finance Companion © 2026")
-        lines.append("=" * 65)
-
+        # 2. Prompt user where to save the .rcd file
         timestamp_str = today.toString("yyyyMMdd")
-        filename = f"BudgetWise_WeekReport_{self.username}_{timestamp_str}.txt"
-        full_path = os.path.join(target_dir, filename)
-
-        counter = 1
-        while os.path.exists(full_path):
-            filename = f"BudgetWise_WeekReport_{self.username}_{timestamp_str}_{counter}.txt"
-            full_path = os.path.join(target_dir, filename)
-            counter += 1
+        default_file = os.path.join(self.report_export_path, f"BudgetWise_Week_{self.username}_{timestamp_str}.rcd")
+        
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Weekly Record Archive",
+            default_file,
+            "BudgetWise Records (*.rcd);;All Files (*)"
+        )
+        if not file_path:
+            return
 
         try:
-            with open(full_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines))
+            saved_file = RCDFileManager.save_file(file_path, rcd_bytes)
             QMessageBox.information(
                 self, 
-                "Download Successful", 
-                f"Your 7-day statement has been saved to:\n\n{full_path}"
+                "Export Complete", 
+                f"Your verified weekly record (.rcd) has been generated and saved to:\n\n{saved_file}"
             )
         except Exception as e:
-            QMessageBox.warning(self, "Export Failed", f"Could not write file:\n{e}")
+            QMessageBox.warning(self, "Export Failed", f"Could not write .rcd file:\n{e}")
 
     def update_report(self, base_allowance, transactions):
         self.current_base_allowance = base_allowance

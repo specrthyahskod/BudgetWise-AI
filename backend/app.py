@@ -31,10 +31,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. Custom NLP Classifier & Risk Heuristic
+# 1. Product categorizer and Risk analyzer
 nlp_engine = StudentAIEngine() if StudentAIEngine else None
 
-# 2. Custom Ordinary Least Squares (OLS) Math Engine
+# 2. Financial Math Model SP
 class FinancialMathModel:
     def __init__(self, total_fortnight_days=14):
         self.total_days = total_fortnight_days
