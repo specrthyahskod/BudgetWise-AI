@@ -18,7 +18,6 @@ from pages.signup import Signup
 from pages.reports import FinancialReportPage
 from pages.calculator import CalculatorPage
 
-# Import root-level session persistence manager
 try:
     import session_manager
 except ImportError:
@@ -319,7 +318,7 @@ class AffordabilityChatPanel(QWidget):
         work_hours = cost / net_hourly_wage
 
         current_balance = 2850.0
-        bal_attr = getattr(self.app.home_page, "balance", None)
+        bal_attr = getattr(self.app.home_page, "total_budget", None)
         if bal_attr is not None:
             try:
                 current_balance = float(bal_attr)
@@ -391,13 +390,13 @@ class AffordabilityChatPanel(QWidget):
                 "buffer_color": color,
                 "projected_bal": remaining_balance
             }
-        
+
+
 class BudgetWiseApp(QWidget):
     def __init__(self):
         super().__init__()
         self.afford_btn = None
         self.init_ui()
-        self.check_auto_login()
 
     def init_ui(self):
         self.setWindowTitle("BudgetWise AI")
@@ -488,22 +487,20 @@ class BudgetWiseApp(QWidget):
 
         self.setLayout(self.main_layout)
         self.setup_affordability_sidebar_button()
-        self.switch_page(0)
 
-    def check_auto_login(self):
-        """Checks for existing session to bypass login and onboarding on startup."""
-        if not session_manager:
-            return
+        # Session-aware boot router
+        has_active_session = False
+        if session_manager:
+            sess = session_manager.load_session()
+            username = sess.get("username", "")
+            if sess.get("logged_in") and username:
+                has_active_session = True
+                self.home_page.set_username(username)
+                self.setup_affordability_sidebar_button()
+                self.switch_page(1)
 
-        session = session_manager.load_session()
-        is_logged_in = session.get("logged_in", False)
-        onboarding_done = session.get("onboarding_completed", False)
-        username = session.get("username", "")
-
-        if is_logged_in and onboarding_done and username:
-            self.home_page.set_username(username)
-            self.setup_affordability_sidebar_button()
-            self.switch_page(1)
+        if not has_active_session:
+            self.switch_page(0)
 
     def setup_affordability_sidebar_button(self):
         if not isinstance(self.home_page, QWidget):
@@ -582,7 +579,6 @@ class BudgetWiseApp(QWidget):
             self.affordability_sidebar.hide()
 
     def on_login_success(self, username):
-        # Save active session so the user doesn't have to re-login on startup
         if session_manager:
             session_manager.save_session(username=username, onboarding_completed=True)
 
@@ -597,7 +593,6 @@ class BudgetWiseApp(QWidget):
         self.switch_page(4)
 
     def handle_logout(self):
-        # Clear persisted session upon user logout
         if session_manager:
             session_manager.clear_session()
 

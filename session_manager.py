@@ -7,7 +7,9 @@ def load_session() -> dict:
     if os.path.exists(SESSION_FILE):
         try:
             with open(SESSION_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
         except Exception:
             return {}
     return {}
@@ -15,12 +17,15 @@ def load_session() -> dict:
 def save_session(username: str, onboarding_completed: bool = True):
     data = {
         "logged_in": True,
-        "username": username,
-        "onboarding_completed": onboarding_completed
+        "username": str(username).strip(),
+        "onboarding_completed": bool(onboarding_completed)
     }
     try:
+        folder = os.path.dirname(SESSION_FILE)
+        if folder and not os.path.exists(folder):
+            os.makedirs(folder, exist_ok=True)
         with open(SESSION_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=4)
     except Exception:
         pass
 

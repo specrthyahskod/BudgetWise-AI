@@ -18,6 +18,11 @@ from pages.onboarding import StudentOnboardingWizard
 from widgets.study_dialog import StudyShiftMatrixDialog
 from widgets.student_tax import TaxCalculator
 
+try:
+    import session_manager
+except ImportError:
+    session_manager = None
+
 ai_engine = StudentAIEngine()
 
 COUNTRY_DATA = load_country_currency_data()
@@ -212,7 +217,7 @@ class EmergencyFundDialog(QDialog):
                 return
             self.current_fund += val
             self.accept()
-        except:
+        except Exception:
             pass
 
     def withdraw(self):
@@ -231,7 +236,7 @@ class EmergencyFundDialog(QDialog):
                 return
             self.current_fund -= val
             self.accept()
-        except:
+        except Exception:
             pass
 
     def get_fund(self):
@@ -297,7 +302,7 @@ class CurrencyConverterDialog(QDialog):
             converted = aud * rate
             symbol = currency_code.split(" ")[1]
             self.result_label.setText(f"Converted: {symbol}{converted:,.2f}")
-        except:
+        except Exception:
             self.result_label.setText("Enter a valid number!")
 
 class VisaWorkTrackerDialog(QDialog):
@@ -430,12 +435,12 @@ class SetWageDialog(QDialog):
         h_text = self.hours_input.text().strip()
         try:
             w = float(w_text)
-        except:
+        except Exception:
             w = 26.44
 
         try:
             h = float(h_text)
-        except:
+        except Exception:
             h = 6.0
 
         return w, h
@@ -528,7 +533,7 @@ class AddTransactionDialog(QDialog):
             if val <= 0:
                 self.error_label.setText("Amount must be greater than 0.")
                 return
-        except:
+        except Exception:
             self.error_label.setText("Enter a valid numeric amount.")
             return
 
@@ -574,12 +579,26 @@ class home(QWidget):
         self.username = username
         all_accounts = self.data_manager.load_data()
         
+        session_done = False
+        if session_manager:
+            sess = session_manager.load_session()
+            if sess.get("logged_in") and sess.get("onboarding_completed") and sess.get("username") == self.username:
+                session_done = True
+
         if self.username in all_accounts:
             user_info = all_accounts[self.username]
-            if not user_info.get("onboarding_completed", False):
+            has_configured_profile = (
+                user_info.get("onboarding_completed", False) or 
+                session_done or 
+                bool(user_info.get("work_days")) or 
+                bool(user_info.get("transactions"))
+            )
+
+            if not has_configured_profile:
                 self.launch_onboarding_wizard()
                 return
 
+            user_info["onboarding_completed"] = True
             self.hourly_wage = user_info.get("hourly_wage", 26.44)
             self.hours_per_shift = user_info.get("hours_per_shift", 6.0)
             self.work_days = user_info.get("work_days", [])
@@ -597,9 +616,11 @@ class home(QWidget):
                 self.fortnight_start_date = QDate.fromString(fn_date_str, "yyyy-MM-dd")
             else:
                 self.fortnight_start_date = QDate.currentDate()
+            self.data_manager.save_data(all_accounts)
         else:
-            self.launch_onboarding_wizard()
-            return
+            if not session_done:
+                self.launch_onboarding_wizard()
+                return
 
         self.welcome_label.setText(f"Welcome back, {self.username}! 👋")
         
@@ -760,8 +781,12 @@ class home(QWidget):
             curr_user["username"] = self.username
             curr_user["fortnight_start_date"] = self.fortnight_start_date.toString("yyyy-MM-dd")
             curr_user["report_export_path"] = self.report_export_path
+            curr_user["onboarding_completed"] = True
             all_accounts[self.username] = curr_user
             self.data_manager.save_data(all_accounts)
+
+            if session_manager:
+                session_manager.save_session(self.username, onboarding_completed=True)
             
             self.set_username(self.username)
 
