@@ -25,7 +25,7 @@
 
 Available natively on desktop via PyQt5 and mobile via Flet/Flutter, underpinned by a fault-tolerant microservice inference API deployed on Render 1D.
 
-]Click here to download the app (Windows 11+/Linux)](https://github.com/specrthyahskod/BudgetWise-AI/releases/download/application/Win-standalone_app32.zip)
+[Click here to download the app (Windows 11+/Linux)](https://github.com/specrthyahskod/BudgetWise-AI/releases/download/application/Win-standalone_app32.zip)
 
 ---
 
