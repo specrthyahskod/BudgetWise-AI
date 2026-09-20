@@ -23,9 +23,9 @@
 
 **BudgetWise AI** is a multi-platform financial intelligence and predictive budget-planning system built in Python, tailored specifically for international students studying abroad to manage cross-border currency exposure, statutory wage compliance, tax withholdings, and solvency runways[cite: 3].
 
-Available natively on desktop via PyQt5 and mobile via Flet / Flutter, underpinned by a fault-tolerant microservice inference API deployed on Render 1D.
+Available natively on desktop via PyQt5 and mobile via Flet/Flutter, underpinned by a fault-tolerant microservice inference API deployed on Render 1D.
 
-Click here to download the app (Windows 11+/Linux)--> https://github.com/specrthyahskod/BudgetWise-AI/releases/download/application/Win-standalone_app32.zip
+]Click here to download the app (Windows 11+/Linux)](https://github.com/specrthyahskod/BudgetWise-AI/releases/download/application/Win-standalone_app32.zip)
 
 ---
 
