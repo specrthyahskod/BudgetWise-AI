@@ -27,9 +27,11 @@ Available natively on desktop via PyQt5 and mobile via Flet/Flutter, underpinned
 
 ---
 
+## SETUP INSTRCTIONS: 
+
 [Click here to download the app (Windows 11+/Linux)](https://github.com/specrthyahskod/BudgetWise-AI/releases/download/application/Win-standalone_app32.zip)
 
-## NOTES:
+# NOTES:
 - Download and extract the .zip file.
 - Open the extracted BudgetWise AI folder.
 - Right-click BudgetWise AI.exe ---> Send to---> Desktop(create shortcut).
