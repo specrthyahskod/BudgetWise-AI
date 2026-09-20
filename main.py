@@ -18,6 +18,12 @@ from pages.signup import Signup
 from pages.reports import FinancialReportPage
 from pages.calculator import CalculatorPage
 
+# Import root-level session persistence manager
+try:
+    import session_manager
+except ImportError:
+    session_manager = None
+
 
 def get_resource_path(relative_path: str) -> str:
     """Resolves asset paths for local development and PyInstaller onefile bundles."""
@@ -323,8 +329,6 @@ class AffordabilityChatPanel(QWidget):
         remaining_balance = current_balance - cost
 
         if cost < 2000.0:
-            start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-            week_records = [r for r in records if r["date"] >= start_of_week]
             days_left = max(1, 7 - now.weekday())
             daily_safespend = max(0.0, remaining_balance / days_left)
 
@@ -393,6 +397,7 @@ class BudgetWiseApp(QWidget):
         super().__init__()
         self.afford_btn = None
         self.init_ui()
+        self.check_auto_login()
 
     def init_ui(self):
         self.setWindowTitle("BudgetWise AI")
@@ -485,6 +490,21 @@ class BudgetWiseApp(QWidget):
         self.setup_affordability_sidebar_button()
         self.switch_page(0)
 
+    def check_auto_login(self):
+        """Checks for existing session to bypass login and onboarding on startup."""
+        if not session_manager:
+            return
+
+        session = session_manager.load_session()
+        is_logged_in = session.get("logged_in", False)
+        onboarding_done = session.get("onboarding_completed", False)
+        username = session.get("username", "")
+
+        if is_logged_in and onboarding_done and username:
+            self.home_page.set_username(username)
+            self.setup_affordability_sidebar_button()
+            self.switch_page(1)
+
     def setup_affordability_sidebar_button(self):
         if not isinstance(self.home_page, QWidget):
             return
@@ -562,6 +582,10 @@ class BudgetWiseApp(QWidget):
             self.affordability_sidebar.hide()
 
     def on_login_success(self, username):
+        # Save active session so the user doesn't have to re-login on startup
+        if session_manager:
+            session_manager.save_session(username=username, onboarding_completed=True)
+
         self.home_page.set_username(username)
         self.setup_affordability_sidebar_button()
         self.switch_page(1)
@@ -573,6 +597,10 @@ class BudgetWiseApp(QWidget):
         self.switch_page(4)
 
     def handle_logout(self):
+        # Clear persisted session upon user logout
+        if session_manager:
+            session_manager.clear_session()
+
         if hasattr(self.login_widget, "reset_fields"):
             self.login_widget.reset_fields()
         if hasattr(self, "affordability_sidebar"):
