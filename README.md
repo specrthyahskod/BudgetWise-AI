@@ -111,3 +111,12 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 # Linux/macOS
 source .venv/bin/activate
+
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# Run desktop client from source
+python main.py
+
+# Compile standalone Windows binary via specfile
+pyinstaller --noconfirm build_config.spec
