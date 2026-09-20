@@ -320,7 +320,6 @@ class AffordabilityChatPanel(QWidget):
         if cost < 2000.0:
             start_of_week = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
             week_records = [r for r in records if r["date"] >= start_of_week]
-            week_spent = sum(r["amount"] for r in week_records)
             days_left = max(1, 7 - now.weekday())
             daily_safespend = max(0.0, remaining_balance / days_left)
 
@@ -453,7 +452,7 @@ class BudgetWiseApp(QWidget):
         footer_layout.setContentsMargins(10, 5, 10, 10)
         footer_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        copyright_label = QLabel("© 2026 BudgetWise AI. All Rights Reserved to Oak Technologies. This is a high school final year research project.")
+        copyright_label = QLabel("© 2026 BudgetWise AI. All Rights Reserved to Oak Technologies. High school capstone project.")
         copyright_label.setFont(QFont("Segoe UI", 8))
         copyright_label.setStyleSheet("color: #64748B; font-weight: bold; background: transparent;")
 
@@ -563,7 +562,7 @@ class BudgetWiseApp(QWidget):
     def show_report_page(self):
         self.report_page.set_user_context(self.home_page.username)
         budget, transactions = self.home_page.get_report_data()
-        self.report_page.update_report(budget, transactions) 
+        self.report_page.update_report(budget, transactions)
         self.switch_page(4)
 
     def handle_logout(self):
@@ -576,10 +575,15 @@ class BudgetWiseApp(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    if len(sys.argv) > 1 and sys.argv[1].lower().endswith(".rcd"):
+        from tools.rcd_complier import RCDViewerWindow
+        viewer = RCDViewerWindow(target_filepath=sys.argv[1])
+        viewer.show()
+        sys.exit(app.exec_())
+
     window = BudgetWiseApp()
     window.show()
     sys.exit(app.exec_())
-
 
 if __name__ == "__main__":
     main()
