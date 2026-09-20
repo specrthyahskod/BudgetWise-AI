@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QStackedWidget, QTextEdit, QLineEdit, QPushButton, QScrollArea, QFrame
 )
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QPixmap, QBrush, QPalette, QColor
+from PyQt5.QtGui import QFont, QPixmap, QBrush, QPalette, QColor, QIcon
 
 from pages.login import Login
 from pages.home import home
@@ -18,6 +18,11 @@ from pages.signup import Signup
 from pages.reports import FinancialReportPage
 from pages.calculator import CalculatorPage
 
+
+def get_resource_path(relative_path: str) -> str:
+    """Resolves asset paths for local development and PyInstaller onefile bundles."""
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 class AffordabilityChatPanel(QWidget):
     def __init__(self, app_reference):
@@ -382,8 +387,7 @@ class AffordabilityChatPanel(QWidget):
                 "buffer_color": color,
                 "projected_bal": remaining_balance
             }
-
-
+        
 class BudgetWiseApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -393,6 +397,10 @@ class BudgetWiseApp(QWidget):
     def init_ui(self):
         self.setWindowTitle("BudgetWise AI")
         self.resize(1100, 750)
+
+        logo_path = get_resource_path(os.path.join("assets", "BudgetWise_AI_logo.png"))
+        if os.path.exists(logo_path):
+            self.setWindowIcon(QIcon(logo_path))
 
         self.main_layout = QVBoxLayout()
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -519,8 +527,7 @@ class BudgetWiseApp(QWidget):
         if is_logged_in:
             palette.setColor(QPalette.Window, QColor("#0F172A"))
         else:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            image_path = os.path.join(base_dir, "assets", "background.png")
+            image_path = get_resource_path(os.path.join("assets", "background.png"))
             if os.path.exists(image_path):
                 pixmap = QPixmap(image_path)
                 scaled_pixmap = pixmap.scaled(
@@ -575,8 +582,12 @@ class BudgetWiseApp(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+    
     if len(sys.argv) > 1 and sys.argv[1].lower().endswith(".rcd"):
-        from tools.rcd_complier import RCDViewerWindow
+        try:
+            from tools.rcd_complier import RCDViewerWindow
+        except ImportError:
+            from tools.rcd_complier import RCDViewerWindow
         viewer = RCDViewerWindow(target_filepath=sys.argv[1])
         viewer.show()
         sys.exit(app.exec_())
@@ -584,6 +595,7 @@ def main():
     window = BudgetWiseApp()
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

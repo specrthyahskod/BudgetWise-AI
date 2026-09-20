@@ -1,8 +1,22 @@
+"""
+BudgetWise Record Viewer (.rcd)
+Opens and displays financial records when you double-click an .rcd file.
+"""
+
 import os
 import sys
 import json
 import csv
 from pathlib import Path
+
+# Find the project root folder so imports work from any folder
+CURRENT_FILE = Path(__file__).resolve()
+PROJECT_ROOT = CURRENT_FILE.parent if (CURRENT_FILE.parent / "models").exists() else CURRENT_FILE.parent.parent
+
+# Add project root to python path and switch working directory to it
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+os.chdir(str(PROJECT_ROOT))
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -12,11 +26,14 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 
-ROOT_DIR = Path(__file__).resolve().parent.parent if Path(__file__).resolve().parent.name == "tools" else Path(__file__).resolve().parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
+# Import the rcd file manager
 from models.rcd_format import RCDFileManager, InvalidRCDFileError
+
+# Try to import the user manager to find saved folder paths
+try:
+    from utils.user_data_manager import UserDataManager
+except ImportError:
+    UserDataManager = None
 
 
 class RCDViewerWindow(QMainWindow):
@@ -24,15 +41,34 @@ class RCDViewerWindow(QMainWindow):
         super().__init__()
         self.current_filepath: str | None = target_filepath
         self.unpacked_data = None
+        
+        # Default save path is Desktop
+        self.user_storage_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        self._load_user_storage_preference()
 
         self.setWindowTitle("BudgetWise Record Viewer (.rcd)")
-        self.resize(850, 620)
+        self.resize(880, 640)
         self.init_ui()
 
-        if self.current_filepath and os.path.exists(self.current_filepath):
+        # If a file was passed when opening the app, load it now
+        if self.current_filepath:
             self.load_rcd_file(self.current_filepath)
 
+    def _load_user_storage_preference(self):
+        # Look for the user's custom save folder saved in user settings
+        if UserDataManager:
+            try:
+                manager = UserDataManager()
+                all_data = manager.load_data()
+                if isinstance(all_data, dict) and all_data:
+                    first_user = next(iter(all_data.values()))
+                    if isinstance(first_user, dict):
+                        self.user_storage_path = first_user.get("report_export_path", self.user_storage_path)
+            except Exception:
+                pass
+
     def init_ui(self):
+        # Window styling
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #0F172A;
@@ -68,14 +104,15 @@ class RCDViewerWindow(QMainWindow):
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(16)
 
+        # Top header area
         top_bar = QHBoxLayout()
         title_box = QVBoxLayout()
 
-        self.title_lbl = QLabel("📁 BudgetWise Complier")
+        self.title_lbl = QLabel("📁 BudgetWise Financial Archive Reader")
         self.title_lbl.setFont(QFont("Segoe UI", 16, QFont.Bold))
         self.title_lbl.setStyleSheet("color: #38BDF8;")
 
-        self.file_path_lbl = QLabel("No file loaded. Click 'Open .rcd File' to inspect.")
+        self.file_path_lbl = QLabel("No file loaded. Click 'Open Other .rcd' to choose a file.")
         self.file_path_lbl.setFont(QFont("Segoe UI", 9))
         self.file_path_lbl.setStyleSheet("color: #94A3B8;")
 
@@ -84,6 +121,7 @@ class RCDViewerWindow(QMainWindow):
         top_bar.addLayout(title_box)
         top_bar.addStretch()
 
+        # Buttons at top right
         open_btn = QPushButton("Open Other .rcd")
         open_btn.clicked.connect(self.browse_file)
         top_bar.addWidget(open_btn)
@@ -96,6 +134,7 @@ class RCDViewerWindow(QMainWindow):
 
         main_layout.addLayout(top_bar)
 
+        # Four status cards in a row
         metrics_layout = QHBoxLayout()
         metrics_layout.setSpacing(12)
 
@@ -110,6 +149,7 @@ class RCDViewerWindow(QMainWindow):
         metrics_layout.addWidget(self.card_spent)
         main_layout.addLayout(metrics_layout)
 
+        # Table container
         table_frame = QFrame()
         table_frame.setStyleSheet("background-color: #1E293B; border-radius: 10px; border: 1px solid #334155;")
         table_layout = QVBoxLayout(table_frame)
@@ -120,6 +160,7 @@ class RCDViewerWindow(QMainWindow):
         table_heading.setStyleSheet("color: #E2E8F0; border: none; background: transparent;")
         table_layout.addWidget(table_heading)
 
+        # Transactions table
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Date", "Category", "Description", "Amount"])
@@ -150,6 +191,7 @@ class RCDViewerWindow(QMainWindow):
         main_layout.addWidget(table_frame, 1)
 
     def _create_metric_card(self, title: str, initial_val: str, text_color: str):
+        # Helper to make a simple small info box
         card = QFrame()
         card.setFixedHeight(75)
         card.setStyleSheet("background-color: #1E293B; border-radius: 8px; border: 1px solid #334155;")
@@ -170,20 +212,28 @@ class RCDViewerWindow(QMainWindow):
         return card, lbl_v
 
     def browse_file(self):
+        # Open file picker starting in the user's preferred folder
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open BudgetWise Record", "", "BudgetWise Records (*.rcd);;All Files (*)"
+            self, "Open BudgetWise Record", self.user_storage_path, "BudgetWise Records (*.rcd);;All Files (*)"
         )
         if path:
             self.load_rcd_file(path)
 
     def load_rcd_file(self, filepath: str):
-        self.current_filepath = filepath
-        self.file_path_lbl.setText(filepath)
+        abs_path = os.path.abspath(filepath)
+        self.current_filepath = abs_path
+        self.file_path_lbl.setText(abs_path)
+
+        if not os.path.exists(abs_path):
+            QMessageBox.warning(self, "File Not Found", f"Cannot find archive:\n{abs_path}")
+            return
 
         try:
-            data = RCDFileManager.unpack_file(filepath)
+            # Read and unpack the rcd file
+            data = RCDFileManager.unpack_file(abs_path)
             self.unpacked_data = data
 
+            # Update status badges
             self.lbl_status.setText("VERIFIED ✅")
             self.lbl_status.setStyleSheet("color: #10B981; border: none; background: transparent;")
 
@@ -197,6 +247,7 @@ class RCDViewerWindow(QMainWindow):
             currency = summary.get("currency", "AUD")
             self.lbl_spent.setText(f"${float(total_spent):,.2f} {currency}")
 
+            # Fill in the table rows
             records = data.get("records", [])
             self.table.setRowCount(len(records))
             for idx, r in enumerate(records):
@@ -216,6 +267,7 @@ class RCDViewerWindow(QMainWindow):
             self.export_btn.setEnabled(True)
 
         except InvalidRCDFileError as e:
+            # File was changed outside the app or is broken
             self.lbl_status.setText("TAMPERED ❌")
             self.lbl_status.setStyleSheet("color: #EF4444; border: none; background: transparent;")
             self.table.setRowCount(0)
@@ -223,24 +275,23 @@ class RCDViewerWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Archive Security Error",
-                f"The selected file failed cryptographic integrity checks:\n\n{e}\n\n"
-                "This file may have been modified or corrupted outside BudgetWise AI."
+                f"The selected file failed security checks:\n\n{e}\n\n"
+                "This file was modified or corrupted outside BudgetWise AI."
             )
         except Exception as e:
             QMessageBox.critical(self, "Read Error", f"Unable to open .rcd archive:\n{e}")
 
     def decompile_current_archive(self):
-        """Allows non-technical users to decompile the archive back to JSON or CSV."""
-        if not self.unpacked_data:
+        # Lets the user save the data as a normal JSON or CSV file
+        if not self.unpacked_data or not self.current_filepath:
             return
 
-        default_base = self.current_filepath if self.current_filepath else "export_record.rcd"
-        suggested_path = str(Path(default_base).with_suffix(".json"))
+        default_base = os.path.splitext(self.current_filepath)[0] + ".json"
 
         save_path, selected_filter = QFileDialog.getSaveFileName(
             self,
             "Decompile Financial Archive",
-            suggested_path,
+            default_base,
             "JSON Format (*.json);;CSV Format (*.csv)"
         )
         if not save_path:
@@ -264,7 +315,10 @@ class RCDViewerWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    
+    # Check if a file path was passed in when double-clicking
     file_to_open = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1].lower().endswith(".rcd") else None
+    
     window = RCDViewerWindow(file_to_open)
     window.show()
     sys.exit(app.exec_())
