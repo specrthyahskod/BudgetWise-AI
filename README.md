@@ -4,7 +4,7 @@
 
 # BudgetWise AI v2.2.0 (Windows Standalone App release)
   
-  **Cross-Platform Financial Intelligence & Statutory Governance Engine for International Students**
+  **Cross-Platform Financial Assistant and Financial Stability Engine for International Students studying on a budget.**
 
   [![FastAPI Status](https://img.shields.io/badge/API-FastAPI%200.110+-009688.svg?style=flat&logo=fastapi)](https://budgetwise-ai-mobile.onrender.com/docs)
   [![Flutter / Flet Engine](https://img.shields.io/badge/UI-Flet%200.86+-02569B.svg?style=flat&logo=flutter)](https://flet.dev)
@@ -111,3 +111,12 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 # Linux/macOS
 source .venv/bin/activate
+
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# Run desktop client from source
+python main.py
+
+# Compile standalone Windows binary via specfile
+pyinstaller --noconfirm build_config.spec
