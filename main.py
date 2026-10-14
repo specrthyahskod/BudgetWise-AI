@@ -1,14 +1,14 @@
 import os
 import sys
 import re
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Any, Optional
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QStackedWidget, QTextEdit, QLineEdit, QPushButton, QScrollArea, QFrame
+    QStackedWidget, QTextEdit, QLineEdit, QPushButton, QFrame
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QPixmap, QBrush, QPalette, QColor, QIcon
 
 from pages.login import Login
@@ -17,6 +17,14 @@ from pages.remember_pass import remember_pass
 from pages.signup import Signup
 from pages.reports import FinancialReportPage
 from pages.calculator import CalculatorPage
+
+# Import FinREST SDK if available in local environment, else set to None
+try:
+    from finrest import FinREST, UserFinancialContext, FinolaResponse
+except ImportError:
+    FinREST = None
+    UserFinancialContext = None
+    FinolaResponse = None
 
 try:
     import session_manager
@@ -29,20 +37,46 @@ def get_resource_path(relative_path: str) -> str:
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
 
+
+class FinolaInferenceWorker(QThread):
+    """Background worker thread executing FinREST requests to keep PyQt5 responsive."""
+    response_ready = pyqtSignal(object)
+    inference_failed = pyqtSignal(str)
+
+    def __init__(self, endpoint_url: str, message: str, context: Any, user_id: str):
+        super().__init__()
+        self.endpoint_url = endpoint_url
+        self.message = message
+        self.context = context
+        self.user_id = user_id
+
+    def run(self):
+        try:
+            if not FinREST:
+                raise ImportError("The 'finrest' SDK is not installed. Run 'pip install finrest==0.1.1'.")
+            
+            client = FinREST(base_url=self.endpoint_url)
+            res = client.chat(
+                message=self.message,
+                user_id=self.user_id,
+                context=self.context
+            )
+            self.response_ready.emit(res)
+        except Exception as e:
+            self.inference_failed.emit(str(e))
+
+
 class AffordabilityChatPanel(QWidget):
     def __init__(self, app_reference):
         super().__init__()
         self.app = app_reference
-        self.setFixedWidth(400)
+        self.worker = None
+        self.setFixedWidth(420)
         self.setStyleSheet("""
             QWidget {
                 background-color: #0F172A;
                 color: #F8FAFC;
                 font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-            }
-            QScrollArea {
-                border: none;
-                background-color: transparent;
             }
             QTextEdit#ChatTranscript {
                 background-color: #090D16;
@@ -76,6 +110,10 @@ class AffordabilityChatPanel(QWidget):
             QPushButton#SendBtn:hover {
                 background-color: #0369A1;
             }
+            QPushButton#SendBtn:disabled {
+                background-color: #334155;
+                color: #64748B;
+            }
             QPushButton#CloseBtn {
                 background-color: transparent;
                 color: #64748B;
@@ -107,16 +145,27 @@ class AffordabilityChatPanel(QWidget):
         main_layout.setContentsMargins(14, 14, 14, 14)
         main_layout.setSpacing(10)
 
+        # Header Bar
         header = QHBoxLayout()
-        icon_lbl = QLabel("💳")
-        icon_lbl.setFont(QFont("Segoe UI", 14))
+        
+        # Avatar (Cute Mascot if exists, robot emoji fallback)
+        avatar_path = get_resource_path(os.path.join("assets", "finola_avatar.png"))
+        if os.path.exists(avatar_path):
+            avatar_lbl = QLabel()
+            pixmap = QPixmap(avatar_path).scaled(32, 32, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            avatar_lbl.setPixmap(pixmap)
+            header.addWidget(avatar_lbl)
+        else:
+            icon_lbl = QLabel("🤖")
+            icon_lbl.setFont(QFont("Segoe UI", 16))
+            header.addWidget(icon_lbl)
         
         title_box = QVBoxLayout()
-        title = QLabel("Affordability Assistant")
+        title = QLabel("Finola AI")
         title.setFont(QFont("Segoe UI", 12, QFont.Bold))
         title.setStyleSheet("color: #F8FAFC; margin: 0;")
         
-        subtitle = QLabel("6-Month Trailing Macro Curve Engine")
+        subtitle = QLabel("Deterministic Policy & Visa Compliance Core")
         subtitle.setFont(QFont("Segoe UI", 8))
         subtitle.setStyleSheet("color: #38BDF8; margin: 0;")
         title_box.addWidget(title)
@@ -127,18 +176,18 @@ class AffordabilityChatPanel(QWidget):
         close_btn.setFixedSize(28, 28)
         close_btn.clicked.connect(self.hide)
 
-        header.addWidget(icon_lbl)
         header.addLayout(title_box)
         header.addStretch()
         header.addWidget(close_btn)
         main_layout.addLayout(header)
 
+        # Quick Question Suggestion Chips
         chips_layout = QHBoxLayout()
         chips_layout.setSpacing(6)
         chips = [
-            ("iPad $500", "Can I buy an iPad for $500?"),
-            ("Groceries $120", "Groceries for $120"),
-            ("MacBook $2400", "MacBook Pro for $2400 AUD"),
+            ("iPad $400", "Can I buy an iPad for $400 AUD?"),
+            ("Groceries $120", "Can I spend $120 on groceries?"),
+            ("OCR Bug", "Receipt OCR failed to parse my supermarket bill."),
         ]
         for label, text in chips:
             chip_btn = QPushButton(label)
@@ -147,20 +196,22 @@ class AffordabilityChatPanel(QWidget):
             chips_layout.addWidget(chip_btn)
         main_layout.addLayout(chips_layout)
 
+        # Transcript Area
         self.chat_history = QTextEdit()
         self.chat_history.setObjectName("ChatTranscript")
         self.chat_history.setReadOnly(True)
         self.display_welcome_banner()
         main_layout.addWidget(self.chat_history, 1)
 
+        # Bottom Input Field
         input_box = QHBoxLayout()
         input_box.setSpacing(8)
         self.input_field = QLineEdit()
         self.input_field.setObjectName("QueryInput")
-        self.input_field.setPlaceholderText("Ask e.g. 'Can I buy shoes for $180?'...")
+        self.input_field.setPlaceholderText("Ask Finola e.g. 'Can I buy an iPad for $400?'...")
         self.input_field.returnPressed.connect(self.process_query)
 
-        self.send_btn = QPushButton("Check")
+        self.send_btn = QPushButton("Ask")
         self.send_btn.setObjectName("SendBtn")
         self.send_btn.clicked.connect(self.process_query)
 
@@ -171,11 +222,12 @@ class AffordabilityChatPanel(QWidget):
     def display_welcome_banner(self):
         self.chat_history.setHtml("""
         <div style='background-color: #131B2E; border: 1px solid #1E293B; border-radius: 8px; padding: 12px; margin-bottom: 8px;'>
-            <div style='color: #38BDF8; font-weight: bold; font-size: 12px; margin-bottom: 4px;'>🤖 System Ready</div>
-            <div style='color: #94A3B8; font-size: 11px; line-height: 1.4;'>
-                I verify your transactions across a <b>6-month historical window</b> to evaluate liquidity safety:
-                <br>&bull; <b>&lt; $2,000 AUD:</b> Evaluated on current week velocity &amp; daily SafeSpend.
-                <br>&bull; <b>&ge; $2,000 AUD:</b> Evaluated against multi-week capital baseline reserves.
+            <div style='color: #38BDF8; font-weight: bold; font-size: 12px; margin-bottom: 4px;'>🛡️ Finola Core Active</div>
+            <div style='color: #94A3B8; font-size: 11px; line-height: 1.45;'>
+                I verify financial transactions against deterministic bounds &amp; student visa limits:
+                <br>&bull; <b>Subclass 500 Compliance:</b> Flags purchases that demand excess work shifts (&gt; 48h/fortnight).
+                <br>&bull; <b>Liquidity Engine:</b> Validates against your emergency reserve &amp; daily SafeSpend.
+                <br>&bull; <b>Auto Triage:</b> Unhandled OCR or database crashes are automatically dispatched to engineering.
             </div>
         </div>
         """)
@@ -189,9 +241,10 @@ class AffordabilityChatPanel(QWidget):
         if not query:
             return
 
+        # Render user message bubble
         user_bubble = f"""
         <div style='display: flex; justify-content: flex-end; margin: 8px 0;'>
-            <div style='background-color: #0284C7; color: #FFFFFF; padding: 8px 14px; border-radius: 14px 14px 2px 14px; font-size: 12px; max-width: 80%;'>
+            <div style='background-color: #0284C7; color: #FFFFFF; padding: 8px 14px; border-radius: 14px 14px 2px 14px; font-size: 12px; max-width: 85%;'>
                 <b>You:</b> {query}
             </div>
         </div>
@@ -199,197 +252,130 @@ class AffordabilityChatPanel(QWidget):
         self.chat_history.append(user_bubble)
         self.input_field.clear()
 
-        price_match = re.findall(r"(?:\$|\b)\s*(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:bucks|aud|dollars|\$|\b)", query, flags=re.IGNORECASE)
-        if not price_match:
-            price_match = re.findall(r"\b\d+(?:,\d{3})*(?:\.\d{1,2})?\b", query)
-
-        if not price_match:
-            error_bubble = """
-            <div style='background-color: #26171E; border-left: 3px solid #EF4444; padding: 8px 10px; border-radius: 4px; margin: 6px 0; font-size: 11px; color: #FCA5A5;'>
-                ⚠️ <b>Unrecognized Price:</b> Please include an amount in AUD (e.g., <i>$450</i>, <i>500 bucks</i>, or <i>1200 AUD</i>).
-            </div>
-            """
-            self.chat_history.append(error_bubble)
-            return
-
-        cost = float(price_match[0].replace(",", ""))
-
-        item_name = query
-        stop_words = [
-            r"can i buy", r"can i afford", r"analyse my past", r"analyze my past", 
-            r"\d+\s*months?", r"expenditure trend", r"and answer", r"bucks", r"aud", 
-            r"dollars", r"\$", r"\bfor\b", r"\ban\b", r"\ba\b", r"\bthe\b"
-        ]
-        for word in stop_words:
-            item_name = re.sub(word, "", item_name, flags=re.IGNORECASE)
-        item_name = re.sub(r"\b\d+(?:,\d{3})*(?:\.\d+)?\b", "", item_name).strip() or "Requested Item"
-        item_name = item_name.strip(" ,.-").capitalize()
-
-        analysis = self.run_affordability_analysis(item_name, cost)
-
-        ai_card = f"""
-        <div style='background-color: #131D31; border: 1px solid #1E293B; border-left: 4px solid {analysis['accent_color']}; border-radius: 8px; padding: 12px; margin: 8px 0;'>
-            <div style='display: flex; justify-content: space-between; align-items: center;'>
-                <span style='font-size: 13px; font-weight: bold; color: {analysis['accent_color']};'>{analysis['verdict']}</span>
-                <span style='font-size: 10px; color: #64748B;'>{analysis['horizon']}</span>
-            </div>
-            <div style='font-size: 12px; color: #E2E8F0; margin: 8px 0; line-height: 1.45;'>{analysis['message']}</div>
-            
-            <div style='background-color: #0A0F1D; border-radius: 6px; padding: 8px; margin-top: 8px;'>
-                <table width='100%' style='font-size: 11px; color: #94A3B8;'>
-                    <tr>
-                        <td width='50%' style='padding: 2px 0;'>⏱ <b>Labor Cost:</b></td>
-                        <td width='50%' style='color: #F8FAFC; text-align: right;'><b>{analysis['work_hours']:.1f} hrs</b> of shifts</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 2px 0;'>📊 <b>6-Mo Avg Burn:</b></td>
-                        <td style='color: #F8FAFC; text-align: right;'>${analysis['monthly_avg_burn']:,.2f}/mo</td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 2px 0;'>🛡 <b>{analysis['buffer_label']}:</b></td>
-                        <td style='color: {analysis['buffer_color']}; text-align: right;'><b>{analysis['buffer_value']}</b></td>
-                    </tr>
-                    <tr>
-                        <td style='padding: 2px 0;'>💰 <b>Projected Cash:</b></td>
-                        <td style='color: #38BDF8; text-align: right;'><b>${analysis['projected_bal']:,.2f} AUD</b></td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        """
-        self.chat_history.append(ai_card)
-
-    def run_affordability_analysis(self, item_name: str, cost: float):
-        raw_budget = 2500.0
-        raw_txs = []
-        try:
-            raw_budget, raw_txs = self.app.home_page.get_report_data()
-        except Exception:
-            pass
-
-        now = datetime.now()
-        records = []
-
-        if isinstance(raw_txs, (list, tuple)):
-            for item in raw_txs:
-                if isinstance(item, dict):
-                    amt = float(item.get("amount", item.get("price", 0.0)))
-                    dt = item.get("date", item.get("timestamp", now))
-                    if isinstance(dt, str):
-                        try:
-                            dt = datetime.fromisoformat(dt)
-                        except Exception:
-                            try:
-                                dt = datetime.strptime(dt[:10], "%Y-%m-%d")
-                            except Exception:
-                                dt = now
-                    elif not isinstance(dt, datetime):
-                        dt = now
-                    records.append({"amount": amt, "date": dt})
-        elif raw_txs is not None and hasattr(raw_txs, "to_dict"):
-            try:
-                dict_rows = raw_txs.to_dict(orient="records")
-                if isinstance(dict_rows, list):
-                    for row in dict_rows:
-                        amt = float(row.get("amount", row.get("price", 0.0)))
-                        dt = row.get("date", row.get("timestamp", now))
-                        if isinstance(dt, str):
-                            try:
-                                dt = datetime.fromisoformat(dt)
-                            except Exception:
-                                try:
-                                    dt = datetime.strptime(dt[:10], "%Y-%m-%d")
-                                except Exception:
-                                    dt = now
-                        elif not isinstance(dt, datetime):
-                            dt = now
-                        records.append({"amount": amt, "date": dt})
-            except Exception:
-                pass
-
-        six_months_ago = now - timedelta(days=180)
-        trailing_6m_records = [r for r in records if r["date"] >= six_months_ago]
-        
-        total_6m_spend = sum(r["amount"] for r in trailing_6m_records)
-        monthly_avg_burn = total_6m_spend / 6.0 if total_6m_spend > 0 else 1250.0
-        weekly_avg_burn = monthly_avg_burn / 4.33
-
-        net_hourly_wage = 22.50
-        work_hours = cost / net_hourly_wage
-
-        current_balance = 2850.0
+        # Build dynamic context from dashboard state
+        current_balance = 1200.0
         bal_attr = getattr(self.app.home_page, "total_budget", None)
         if bal_attr is not None:
             try:
                 current_balance = float(bal_attr)
             except Exception:
                 pass
+
+        now = datetime.now()
+        days_left_in_cycle = max(1, 7 - now.weekday())
+
+        context = UserFinancialContext(
+            current_balance=current_balance,
+            emergency_vault=500.0,
+            hourly_wage=25.0,
+            hours_worked_this_fortnight=34.0,
+            days_left_in_cycle=days_left_in_cycle
+        ) if UserFinancialContext else None
+
+        # Lock UI during inference
+        self.send_btn.setEnabled(False)
+        self.send_btn.setText("Thinking...")
+        self.input_field.setEnabled(False)
+
+        # Launch background worker
+        user_id = getattr(self.app.home_page, "username", "Student_User")
+        self.worker = FinolaInferenceWorker(
+            endpoint_url="http://127.0.0.1:8000",
+            message=query,
+            context=context,
+            user_id=user_id
+        )
+        self.worker.response_ready.connect(self.handle_finola_response)
+        self.worker.inference_failed.connect(self.handle_inference_error)
+        self.worker.start()
+
+    def handle_finola_response(self, response):
+        self.send_btn.setEnabled(True)
+        self.send_btn.setText("Ask")
+        self.input_field.setEnabled(True)
+        self.input_field.setFocus()
+
+        calc = response.diagnostics.get("calculus") if response.diagnostics else None
         
-        remaining_balance = current_balance - cost
+        # Color coding & badge mapping
+        badge_color = "#38BDF8"
+        badge_text = "ADVISORY"
+        
+        if calc:
+            verdict = calc.get("verdict", "APPROVED")
+            if verdict == "APPROVED":
+                badge_color = "#10B981"
+                badge_text = "APPROVED ✅"
+            elif verdict == "VISA_HOURS_RISK":
+                badge_color = "#EF4444"
+                badge_text = "VISA WORK CAP RISK ⚠️"
+            elif verdict == "CRITICAL_BUFFER_WARNING":
+                badge_color = "#F59E0B"
+                badge_text = "BUFFER BREACH 🟡"
+            elif verdict == "DENIED":
+                badge_color = "#EF4444"
+                badge_text = "OVERDRAFT REJECTED ⛔"
 
-        if cost < 2000.0:
-            days_left = max(1, 7 - now.weekday())
-            daily_safespend = max(0.0, remaining_balance / days_left)
+        # Math telemetry table
+        telemetry_html = ""
+        if calc:
+            telemetry_html = f"""
+            <div style='background-color: #0A0F1D; border-radius: 6px; padding: 8px; margin-top: 8px;'>
+                <table width='100%' style='font-size: 11px; color: #94A3B8;'>
+                    <tr>
+                        <td width='50%' style='padding: 2px 0;'>⏱ <b>Shift Requirement:</b></td>
+                        <td width='50%' style='color: #F8FAFC; text-align: right;'><b>{calc.get('hours_needed', 0.0):.1f} hrs</b> work</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 2px 0;'>🛡 <b>Visa Fortnight Left:</b></td>
+                        <td style='color: #F8FAFC; text-align: right;'>{calc.get('remaining_visa_hours', 0.0):.1f} / 48 hrs</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 2px 0;'>💰 <b>Projected Balance:</b></td>
+                        <td style='color: #38BDF8; text-align: right;'>${calc.get('post_balance', 0.0):,.2f} AUD</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 2px 0;'>📅 <b>Daily SafeSpend:</b></td>
+                        <td style='color: #F8FAFC; text-align: right;'>${calc.get('daily_safespend', 0.0):,.2f}/day</td>
+                    </tr>
+                </table>
+            </div>
+            """
 
-            if current_balance < cost:
-                verdict = "CANNOT AFFORD ⛔"
-                color = "#EF4444"
-                msg = f"<b>{item_name}</b> (${cost:,.2f} AUD) exceeds your total current balance of ${current_balance:,.2f} AUD by ${cost - current_balance:,.2f} AUD."
-            elif remaining_balance < (weekly_avg_burn * 0.5):
-                verdict = "HIGH RISK ⚠️"
-                color = "#EF4444"
-                msg = f"Purchasing <b>{item_name}</b> will deplete your liquidity to ${remaining_balance:,.2f} AUD, falling below your 6-month safety threshold (~${weekly_avg_burn * 0.5:,.2f})."
-            elif daily_safespend < 30.0:
-                verdict = "CAUTION 🟡"
-                color = "#F59E0B"
-                msg = f"<b>{item_name}</b> is purchasable, but slashes your remaining daily SafeSpend to <b>${daily_safespend:,.2f}/day</b> for the next {days_left} days."
-            else:
-                verdict = "SAFE TO BUY ✅"
-                color = "#10B981"
-                msg = f"<b>{item_name}</b> comfortably fits your spending trends. You maintain an ample SafeSpend reserve of <b>${daily_safespend:,.2f}/day</b> through the end of the week."
+        # System issue badge if Finola caught a bug report
+        triage_html = ""
+        if response.issue_detected:
+            triage_html = """
+            <div style='background-color: #2D1515; border: 1px solid #7F1D1D; border-radius: 6px; padding: 6px 10px; margin-top: 6px; font-size: 11px; color: #FCA5A5;'>
+                🚨 <b>Incident Logged:</b> Diagnostic report dispatched to the administrator inbox.
+            </div>
+            """
 
-            return {
-                "verdict": verdict,
-                "accent_color": color,
-                "horizon": "Current Week Micro Curve (< $2k)",
-                "message": msg,
-                "work_hours": work_hours,
-                "monthly_avg_burn": monthly_avg_burn,
-                "buffer_label": "Daily SafeSpend",
-                "buffer_value": f"${daily_safespend:,.2f}/day",
-                "buffer_color": color,
-                "projected_bal": remaining_balance
-            }
+        ai_card = f"""
+        <div style='background-color: #131D31; border: 1px solid #1E293B; border-left: 4px solid {badge_color}; border-radius: 8px; padding: 12px; margin: 8px 0;'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <span style='font-size: 12px; font-weight: bold; color: {badge_color};'>{badge_text}</span>
+                <span style='font-size: 10px; color: #64748B;'>Finola SLM</span>
+            </div>
+            <div style='font-size: 12px; color: #E2E8F0; margin: 8px 0; line-height: 1.45;'>{response.reply}</div>
+            {telemetry_html}
+            {triage_html}
+        </div>
+        """
+        self.chat_history.append(ai_card)
 
-        else:
-            capital_reserve_needed = monthly_avg_burn * 1.5
-            surplus = remaining_balance - capital_reserve_needed
-
-            if current_balance < cost:
-                verdict = "INSUFFICIENT CAPITAL ⛔"
-                color = "#EF4444"
-                msg = f"Cannot afford <b>{item_name}</b>. Total available capital is ${current_balance:,.2f} AUD (Shortfall: ${cost - current_balance:,.2f} AUD)."
-            elif surplus < 0:
-                verdict = "STRUCTURAL DEFICIT ⚠️"
-                color = "#F59E0B"
-                msg = f"Allocating ${cost:,.2f} AUD for <b>{item_name}</b> cuts into your 6-month baseline emergency runway (${capital_reserve_needed:,.2f} AUD). Projected deficit: ${abs(surplus):,.2f} AUD."
-            else:
-                verdict = "CAPITAL APPROVED ✅"
-                color = "#10B981"
-                msg = f"Your 6-month spending trends confirm that <b>{item_name}</b> is safe to purchase. You preserve your emergency buffer (${capital_reserve_needed:,.2f} AUD) with a ${surplus:,.2f} surplus."
-
-            return {
-                "verdict": verdict,
-                "accent_color": color,
-                "horizon": "Macro Capital Curve (≥ $2k)",
-                "message": msg,
-                "work_hours": work_hours,
-                "monthly_avg_burn": monthly_avg_burn,
-                "buffer_label": "Capital Runway Surplus",
-                "buffer_value": f"${surplus:,.2f} AUD",
-                "buffer_color": color,
-                "projected_bal": remaining_balance
-            }
+    def handle_inference_error(self, err_msg):
+        self.send_btn.setEnabled(True)
+        self.send_btn.setText("Ask")
+        self.input_field.setEnabled(True)
+        
+        fallback_bubble = f"""
+        <div style='background-color: #26171E; border-left: 3px solid #EF4444; padding: 8px 10px; border-radius: 4px; margin: 6px 0; font-size: 11px; color: #FCA5A5;'>
+            ⚠️ <b>FinREST Offline:</b> Could not reach backend at <code>http://127.0.0.1:8000</code>.<br>
+            <i>{err_msg}</i>
+        </div>
+        """
+        self.chat_history.append(fallback_bubble)
 
 
 class BudgetWiseApp(QWidget):
@@ -400,7 +386,7 @@ class BudgetWiseApp(QWidget):
 
     def init_ui(self):
         self.setWindowTitle("BudgetWise AI")
-        self.resize(1100, 750)
+        self.resize(1150, 750)
 
         logo_path = get_resource_path(os.path.join("assets", "BudgetWise_AI_logo.png"))
         if os.path.exists(logo_path):
@@ -477,6 +463,7 @@ class BudgetWiseApp(QWidget):
         self.content_layout.setSpacing(0)
         self.content_layout.addWidget(self.stacked_widget, 1)
 
+        # Attach Finola Sidebar
         self.affordability_sidebar = AffordabilityChatPanel(self)
         self.affordability_sidebar.hide()
         self.content_layout.addWidget(self.affordability_sidebar)
@@ -524,7 +511,7 @@ class BudgetWiseApp(QWidget):
                 all_layouts = self.home_page.findChildren(QVBoxLayout)
                 for layout in all_layouts:
                     if layout.indexOf(btn) != -1:
-                        self.afford_btn = QPushButton("Can I Afford This? 💬")
+                        self.afford_btn = QPushButton("Talk to Finola 💬")
                         self.afford_btn.setFont(btn.font())
                         self.afford_btn.setStyleSheet(btn.styleSheet())
                         self.afford_btn.clicked.connect(self.toggle_affordability_chat)
