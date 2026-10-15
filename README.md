@@ -69,6 +69,9 @@ Available natively on desktop via PyQt5 and mobile via Flet/Flutter, underpinned
 
 ## 📝 Changelogs
 
+### v2.2.1
+**BudgetWise AI API Documentation and Status Page:** https://budgetwiseai.site.je/api/
+
 ### v2.2.0 (Latest Release)
 * **Portable Binary Deployment & Frozen Environment Hardening:**
   * Re-architected desktop packaging to a zero-dependency, single-file executable (`--onefile`, `--windowed`) using a declarative PyInstaller `.spec` manifest.
